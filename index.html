@@ -133,6 +133,13 @@
 
                 <!-- Sound & Push Notification Toggle -->
                 <div class="flex items-center gap-1.5 shrink-0">
+                    <button id="btn-webhook-settings" type="button" onclick="openSettingsModal()" title="設定 LINE 推播網址" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95 relative">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <span id="webhook-status-dot" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900"></span>
+                    </button>
                     <button id="btn-sound-toggle" type="button" onclick="toggleSound()" title="切換警報音效" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition active:scale-95">
                         <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
@@ -296,8 +303,8 @@
                         <button type="button" onclick="selectTag(this, '拖車巡邏移動中')" class="tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate">
                             🚛 拖車巡邏移動中
                         </button>
-                        <button type="button" onclick="selectTag(this, '正在開單 / 拖吊')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
-                            📸 正在開單 / 拖吊
+                        <button type="button" onclick="selectTag(this, '正在開單 / 準備拖吊')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
+                            📸 正在開單 / 準備拖吊
                         </button>
                         <button type="button" onclick="selectTag(this, '貨車式吊車出沒')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
                             🏗️ 貨車式吊車出沒
@@ -317,6 +324,45 @@
             </div>
         </div>
 
+        <!-- LINE Webhook Settings Modal -->
+        <div id="settings-modal" class="fixed inset-0 z-50 hidden w-screen max-w-[100vw] overflow-x-hidden">
+            <div onclick="closeSettingsModal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"></div>
+            <div class="bottom-sheet-panel bg-slate-900 border-t border-slate-700 rounded-t-3xl p-4 sm:p-5 shadow-2xl animate-slide-up max-h-[85vh] overflow-y-auto overflow-x-hidden">
+                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3.5"></div>
+                <div class="flex items-start justify-between gap-2 mb-3 min-w-0">
+                    <div class="min-w-0">
+                        <h2 class="text-base sm:text-lg font-black text-white flex items-center gap-1.5 truncate">
+                            <span>🔗 LINE 推播中繼站設定</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">貼上 Google Apps Script 部署的 <code class="text-sky-400">/exec</code> 網址</p>
+                    </div>
+                    <button type="button" onclick="closeSettingsModal()" aria-label="關閉設定" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center shrink-0">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="space-y-3 mt-3">
+                    <div>
+                        <label for="webhook-url-input" class="block text-xs font-bold text-slate-300 mb-1.5">Google Apps Script 網頁應用程式網址</label>
+                        <input id="webhook-url-input" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full max-w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono">
+                    </div>
+
+                    <div id="webhook-status-box" class="rounded-xl bg-slate-800/70 border border-slate-700/80 p-3 text-xs text-slate-300 leading-relaxed">
+                        尚未設定網址。填入後，每次發送或解除拖吊警報都會自動呼叫 LINE 機器人廣播推播給全體好友。
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1">
+                        <button type="button" onclick="testLineWebhook()" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 text-xs font-extrabold transition active:scale-95">
+                            📡 發送測試推播
+                        </button>
+                        <button type="button" onclick="saveWebhookSettings()" class="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-950/50 transition active:scale-95">
+                            💾 儲存網址
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast Feedback Message -->
         <div id="toast" class="fixed bottom-16 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
             <div id="toast-inner" class="max-w-[92vw] px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-white text-xs font-bold shadow-2xl opacity-0 translate-y-2 transition-all duration-200 truncate">
@@ -326,6 +372,138 @@
     </div>
 
     <script>
+        // ==========================================
+        // 0. Google Apps Script LINE Broadcast Webhook
+        // ==========================================
+        // 請將下方預設網址替換為你的 Google Apps Script 部署網址 (/exec)，或直接點擊網頁右上角齒輪貼上儲存
+        const DEFAULT_GAS_LINE_WEBHOOK_URL = 'https://script.google.com/macros/s/你的部署網址/exec';
+        const WEBHOOK_STORAGE_KEY = 'nsysu_gas_line_webhook_url_v1';
+
+        function getLineWebhookUrl() {
+            try {
+                const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
+                if (saved && saved.trim().startsWith('https://')) {
+                    return saved.trim();
+                }
+            } catch (e) {
+                console.warn('無法讀取儲存的 Webhook 網址:', e);
+            }
+            return DEFAULT_GAS_LINE_WEBHOOK_URL;
+        }
+
+        function isWebhookConfigured() {
+            const url = getLineWebhookUrl();
+            return Boolean(url && url.startsWith('https://') && !url.includes('你的部署網址'));
+        }
+
+        async function sendLineBroadcast(area, note, action = 'report') {
+            const webhookUrl = getLineWebhookUrl();
+            if (!isWebhookConfigured()) {
+                console.warn('尚未設定有效的 Google Apps Script /exec 網址，略過 LINE 外部推播');
+                return false;
+            }
+
+            try {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        area: area || '未知區域',
+                        note: note || '發現拖吊車出沒',
+                        action: action
+                    })
+                });
+                return true;
+            } catch (err) {
+                console.error('LINE 推播發送失敗:', err);
+                return false;
+            }
+        }
+
+        // Alias for compatibility
+        const pushAlertToLine = sendLineBroadcast;
+
+        function updateWebhookStatusUI() {
+            const dot = document.getElementById('webhook-status-dot');
+            const statusBox = document.getElementById('webhook-status-box');
+            const configured = isWebhookConfigured();
+
+            if (dot) {
+                dot.className = configured
+                    ? 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900'
+                    : 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900 animate-pulse';
+            }
+
+            if (statusBox) {
+                statusBox.innerHTML = configured
+                    ? `<span class="text-emerald-400 font-bold">✅ 已連線至 LINE 推播中繼站</span><br><span class="text-[11px] text-slate-400 break-all">${escapeHtml(getLineWebhookUrl())}</span>`
+                    : `<span class="text-amber-300 font-bold">⚠️ 尚未填入 /exec 網址</span><br>貼上你的 Google Apps Script 網址並儲存後，按下通報即可自動發送 LINE 手機推播。`;
+            }
+        }
+
+        function openSettingsModal() {
+            const input = document.getElementById('webhook-url-input');
+            const currentUrl = getLineWebhookUrl();
+            input.value = currentUrl.includes('你的部署網址') ? '' : currentUrl;
+            updateWebhookStatusUI();
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function saveWebhookSettings() {
+            const input = document.getElementById('webhook-url-input');
+            const val = input.value.trim();
+
+            if (!val) {
+                localStorage.removeItem(WEBHOOK_STORAGE_KEY);
+                updateWebhookStatusUI();
+                showToast('🗑️ 已清除自訂推播網址');
+                return;
+            }
+
+            if (!val.startsWith('https://script.google.com/')) {
+                showToast('⚠️ 請輸入正確的 https://script.google.com/.../exec 網址');
+                return;
+            }
+
+            try {
+                localStorage.setItem(WEBHOOK_STORAGE_KEY, val);
+                updateWebhookStatusUI();
+                closeSettingsModal();
+                showToast('✅ LINE 推播網址已儲存！');
+            } catch (e) {
+                showToast('❌ 儲存失敗，請檢查瀏覽器儲存權限');
+            }
+        }
+
+        async function testLineWebhook() {
+            const input = document.getElementById('webhook-url-input');
+            const val = input.value.trim();
+            if (val && val.startsWith('https://script.google.com/')) {
+                localStorage.setItem(WEBHOOK_STORAGE_KEY, val);
+                updateWebhookStatusUI();
+            }
+
+            if (!isWebhookConfigured()) {
+                showToast('⚠️ 請先貼上你的 Google Apps Script /exec 網址');
+                return;
+            }
+
+            showToast('📡 正在發送測試推播至 LINE...');
+            const ok = await sendLineBroadcast('測試連線（西子灣校區）', '中山車管會拖吊警報器 LINE 推播測試成功！', 'report');
+            if (ok) {
+                showToast('✅ 已送出推播請求，請查看手機 LINE 通知！');
+            } else {
+                showToast('❌ 推播發送發生錯誤，請檢查網址是否正確');
+            }
+        }
+
         // ==========================================
         // 1. NSYSU Campus Hotspot Data & Coordinates
         // ==========================================
@@ -395,6 +573,7 @@
         // ==========================================
         function init() {
             loadFromStorage();
+            updateWebhookStatusUI();
             renderZoneSelector();
             renderAll();
 
@@ -606,11 +785,12 @@
                 return;
             }
 
+            const finalNote = note || `${selectedTag} — 請附近同學留意！`;
             const newAlert = {
                 id: 'alert-' + now,
                 zoneId: selectedZoneId,
                 tag: selectedTag,
-                note: note || `${zone.name}發現車管會拖吊車，請附近同學注意！`,
+                note: finalNote,
                 createdAt: now,
                 confirmations: 1,
                 status: 'active'
@@ -621,6 +801,13 @@
             saveToStorage();
             renderAll();
             triggerVisualAndAudioAlert(zone, newAlert.note);
+
+            // Dispatch live LINE broadcast via Google Apps Script
+            sendLineBroadcast(zone.name, `${selectedTag}${note ? '（' + note + '）' : ''}`, 'report').then((sent) => {
+                if (sent) {
+                    showToast('📲 已同步發送 LINE 推播給全校同學！');
+                }
+            });
         }
 
         // ==========================================
@@ -646,11 +833,15 @@
             const alert = alerts.find(a => a.id === alertId);
             if (!alert || alert.status !== 'active') return;
 
+            const zone = CAMPUS_ZONES.find(z => z.id === alert.zoneId) || CAMPUS_ZONES[0];
             alert.status = 'cleared';
             alert.clearedAt = Date.now();
             saveToStorage();
             renderAll();
-            showToast('🟢 已回報「拖車已離開」，警報解除！');
+
+            sendLineBroadcast(zone.name, '現場同學回報拖吊車已離開，警報解除！', 'cleared').then((sent) => {
+                showToast(sent ? '🟢 已解除警報並發送 LINE 解除通知！' : '🟢 已回報「拖車已離開」，警報解除！');
+            });
         }
 
         function simulateIncomingAlert() {

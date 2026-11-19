@@ -18,10 +18,6 @@
         extend: {
           fontFamily: {
             sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
-          },
-          animation: {
-            'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'radar-ping': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
           }
         }
       }
@@ -258,10 +254,8 @@
   </div>
 
   <script>
-    // 最新已驗證可回傳 JSON 的 Google Apps Script 網址
     const DEFAULT_GAS_LINE_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbz1eGSkQ2ZM97hAljPD1TRpbslu6efX8zkErWX25P8FGaUQMzKe3PeQPjAc51n68QQ3Lg/exec';
 
-    // 舊版部署 ID 清單，自動遷移至最新預設網址
     const STALE_WEBHOOK_IDS = [
       'AKfycby6FxCT2UrSsrn41CpK0mScJ7U91kb-jMGxxx4JQKtEB29d5W3K5PFQV7vtWdi_zHYpyA',
       'AKfycbyv0nKZVtDVrhrVefbpb0728EnRBdpPOjLZTvCGuAXu6qfsqWS9VJ5-G4zcTbZ_tvFJ_g',

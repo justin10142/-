@@ -303,8 +303,8 @@
                         <button type="button" onclick="selectTag(this, '拖車巡邏移動中')" class="tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate">
                             🚛 拖車巡邏移動中
                         </button>
-                        <button type="button" onclick="selectTag(this, '正在開單 / 準備拖吊')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
-                            📸 正在開單 / 準備拖吊
+                        <button type="button" onclick="selectTag(this, '正在開單/上架')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
+                            📸 正在開單/上架
                         </button>
                         <button type="button" onclick="selectTag(this, '貨車式吊車出沒')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
                             🏗️ 貨車式吊車出沒
@@ -375,8 +375,8 @@
         // ==========================================
         // 0. Google Apps Script LINE Broadcast Webhook
         // ==========================================
-        // 請將下方預設網址替換為你的 Google Apps Script 部署網址 (/exec)，或直接點擊網頁右上角齒輪貼上儲存
-        const DEFAULT_GAS_LINE_WEBHOOK_URL = 'https://script.google.com/macros/s/你的部署網址/exec';
+        // 已直接內建你的 Google Apps Script 部署網址 (/exec)，打開網頁即可自動連線推播
+        const DEFAULT_GAS_LINE_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycby6FxCT2UrSsrn41CpK0mScJ7U91kb-jMGxxx4JQKtEB29d5W3K5PFQV7vtWdi_zHYpyA/exec';
         const WEBHOOK_STORAGE_KEY = 'nsysu_gas_line_webhook_url_v1';
 
         function getLineWebhookUrl() {
@@ -393,18 +393,70 @@
 
         function isWebhookConfigured() {
             const url = getLineWebhookUrl();
-            return Boolean(url && url.startsWith('https://') && !url.includes('你的部署網址'));
+            return Boolean(url && url.startsWith('https://'));
+        }
+
+        function updateWebhookStatusUI() {
+            const dot = document.getElementById('webhook-status-dot');
+            const statusBox = document.getElementById('webhook-status-box');
+            const url = getLineWebhookUrl();
+            const configured = isWebhookConfigured();
+
+            if (dot) {
+                dot.className = configured
+                    ? 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900'
+                    : 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900';
+            }
+
+            if (statusBox) {
+                if (configured) {
+                    statusBox.innerHTML = `<span class="text-emerald-400 font-bold">✅ 已連線至 LINE 推播中繼站</span><br><span class="text-[11px] text-slate-400 break-all font-mono">${escapeHtml(url)}</span>`;
+                } else {
+                    statusBox.textContent = '尚未設定網址。填入後，每次發送或解除拖吊警報都會自動呼叫 LINE 機器人廣播推播給全體好友。';
+                }
+            }
+        }
+
+        function openSettingsModal() {
+            const input = document.getElementById('webhook-url-input');
+            const currentUrl = getLineWebhookUrl();
+            input.value = currentUrl || '';
+            updateWebhookStatusUI();
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function saveWebhookSettings() {
+            const input = document.getElementById('webhook-url-input');
+            const val = input.value.trim();
+            if (val && !val.startsWith('https://')) {
+                showToast('⚠️ 請輸入以 https:// 開頭的 Google Apps Script /exec 網址');
+                return;
+            }
+            try {
+                if (val) {
+                    localStorage.setItem(WEBHOOK_STORAGE_KEY, val);
+                } else {
+                    localStorage.removeItem(WEBHOOK_STORAGE_KEY);
+                }
+            } catch (e) {
+                console.warn('無法儲存 Webhook 設定:', e);
+            }
+            updateWebhookStatusUI();
+            showToast('✅ LINE 推播中繼站網址已儲存！');
         }
 
         async function sendLineBroadcast(area, note, action = 'report') {
-            const webhookUrl = getLineWebhookUrl();
-            if (!isWebhookConfigured()) {
-                console.warn('尚未設定有效的 Google Apps Script /exec 網址，略過 LINE 外部推播');
+            const targetUrl = getLineWebhookUrl();
+            if (!targetUrl || !targetUrl.startsWith('https://')) {
+                console.warn('尚未設定有效的 LINE 推播中繼站網址');
                 return false;
             }
-
             try {
-                await fetch(webhookUrl, {
+                await fetch(targetUrl, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {
@@ -423,143 +475,39 @@
             }
         }
 
-        // Alias for compatibility
         const pushAlertToLine = sendLineBroadcast;
 
-        function updateWebhookStatusUI() {
-            const dot = document.getElementById('webhook-status-dot');
-            const statusBox = document.getElementById('webhook-status-box');
-            const configured = isWebhookConfigured();
-
-            if (dot) {
-                dot.className = configured
-                    ? 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900'
-                    : 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900 animate-pulse';
-            }
-
-            if (statusBox) {
-                statusBox.innerHTML = configured
-                    ? `<span class="text-emerald-400 font-bold">✅ 已連線至 LINE 推播中繼站</span><br><span class="text-[11px] text-slate-400 break-all">${escapeHtml(getLineWebhookUrl())}</span>`
-                    : `<span class="text-amber-300 font-bold">⚠️ 尚未填入 /exec 網址</span><br>貼上你的 Google Apps Script 網址並儲存後，按下通報即可自動發送 LINE 手機推播。`;
-            }
-        }
-
-        function openSettingsModal() {
-            const input = document.getElementById('webhook-url-input');
-            const currentUrl = getLineWebhookUrl();
-            input.value = currentUrl.includes('你的部署網址') ? '' : currentUrl;
-            updateWebhookStatusUI();
-            document.getElementById('settings-modal').classList.remove('hidden');
-        }
-
-        function closeSettingsModal() {
-            document.getElementById('settings-modal').classList.add('hidden');
-        }
-
-        function saveWebhookSettings() {
-            const input = document.getElementById('webhook-url-input');
-            const val = input.value.trim();
-
-            if (!val) {
-                localStorage.removeItem(WEBHOOK_STORAGE_KEY);
-                updateWebhookStatusUI();
-                showToast('🗑️ 已清除自訂推播網址');
-                return;
-            }
-
-            if (!val.startsWith('https://script.google.com/')) {
-                showToast('⚠️ 請輸入正確的 https://script.google.com/.../exec 網址');
-                return;
-            }
-
-            try {
-                localStorage.setItem(WEBHOOK_STORAGE_KEY, val);
-                updateWebhookStatusUI();
-                closeSettingsModal();
-                showToast('✅ LINE 推播網址已儲存！');
-            } catch (e) {
-                showToast('❌ 儲存失敗，請檢查瀏覽器儲存權限');
-            }
-        }
-
         async function testLineWebhook() {
-            const input = document.getElementById('webhook-url-input');
-            const val = input.value.trim();
-            if (val && val.startsWith('https://script.google.com/')) {
-                localStorage.setItem(WEBHOOK_STORAGE_KEY, val);
+            const inputVal = document.getElementById('webhook-url-input').value.trim();
+            if (inputVal && inputVal.startsWith('https://')) {
+                try {
+                    localStorage.setItem(WEBHOOK_STORAGE_KEY, inputVal);
+                } catch (e) {}
                 updateWebhookStatusUI();
             }
-
             if (!isWebhookConfigured()) {
-                showToast('⚠️ 請先貼上你的 Google Apps Script /exec 網址');
+                showToast('⚠️ 請先貼上有效的 https://.../exec 網址');
                 return;
             }
-
-            showToast('📡 正在發送測試推播至 LINE...');
-            const ok = await sendLineBroadcast('測試連線（西子灣校區）', '中山車管會拖吊警報器 LINE 推播測試成功！', 'report');
-            if (ok) {
-                showToast('✅ 已送出推播請求，請查看手機 LINE 通知！');
-            } else {
-                showToast('❌ 推播發送發生錯誤，請檢查網址是否正確');
-            }
+            showToast('📡 正在發送 LINE 測試推播...');
+            const ok = await sendLineBroadcast('測試連線', '中山車管會拖吊警報器 LINE 推播測試成功！', 'report');
+            showToast(ok ? '✅ 已送出測試請求，請確認手機 LINE 通知！' : '❌ 推播發送失敗，請檢查網址');
         }
 
         // ==========================================
         // 1. NSYSU Campus Hotspot Data & Coordinates
         // ==========================================
         const CAMPUS_ZONES = [
-            {
-                id: 'seawall',
-                icon: '🌊',
-                name: '海堤 / 體育館',
-                sub: '蓮海路・海資館前',
-                x: 118,
-                y: 118
-            },
-            {
-                id: 'management',
-                icon: '🏢',
-                name: '管理學院 / 圖資大樓',
-                sub: '社科院・行政大樓前',
-                x: 192,
-                y: 122
-            },
-            {
-                id: 'tunnel',
-                icon: '⛩️',
-                name: '西子灣隧道口 / 活中',
-                sub: '蔣公行館・萊爾富前',
-                x: 342,
-                y: 124
-            },
-            {
-                id: 'engineering',
-                icon: '⚙️',
-                name: '工學院 / 電資大樓',
-                sub: '機電館・理學院周邊',
-                x: 245,
-                y: 82
-            },
-            {
-                id: 'dorms',
-                icon: '🏠',
-                name: '武嶺 / 翠亨宿舍區',
-                sub: '雨樹・山海樓・武嶺坡道',
-                x: 325,
-                y: 62
-            },
-            {
-                id: 'liberal',
-                icon: '🏖️',
-                name: '文學院 / 藝術大樓',
-                sub: '柴山大道・海域中心',
-                x: 138,
-                y: 45
-            }
+            { id: 'seawall', icon: '🌊', name: '海堤 / 體育館', sub: '蓮海路・海資館前', x: 118, y: 118 },
+            { id: 'engineering', icon: '⚙️', name: '工學院 / 電資大樓', sub: '機電館・理學院周邊', x: 245, y: 82 },
+            { id: 'management', icon: '🏢', name: '管理學院 / 圖資大樓', sub: '社科院・行政大樓前', x: 192, y: 122 },
+            { id: 'dorms', icon: '🏠', name: '武嶺 / 翠亨宿舍區', sub: '雨樹・山海樓・武嶺坡道', x: 325, y: 62 },
+            { id: 'tunnel', icon: '⛩️', name: '西子灣隧道口 / 活中', sub: '蔣公行館・萊爾富前', x: 342, y: 124 },
+            { id: 'liberal', icon: '🏖️', name: '文學院 / 藝術大樓', sub: '柴山大道・海域中心', x: 138, y: 45 }
         ];
 
-        const ALERT_TTL_MS = 15 * 60 * 1000;   // 15 minutes auto-expiration
-        const COOLDOWN_MS = 5 * 60 * 1000;     // 5 minutes anti-spam cooldown per zone
+        const ALERT_TTL_MS = 15 * 60 * 1000;
+        const COOLDOWN_MS = 5 * 60 * 1000;
 
         let alerts = [];
         let selectedZoneId = null;
@@ -569,11 +517,11 @@
         let confirmedIds = new Set();
 
         // ==========================================
-        // 2. Initialization & Storage
+        // 2. Initialization & Seed Data
         // ==========================================
         function init() {
-            loadFromStorage();
             updateWebhookStatusUI();
+            loadFromStorage();
             renderZoneSelector();
             renderAll();
 
@@ -587,22 +535,19 @@
                 if (!countEl) return;
                 const current = parseInt(countEl.textContent, 10) || 148;
                 const delta = Math.floor(Math.random() * 5) - 2;
-                countEl.textContent = String(Math.max(98, current + delta));
+                countEl.textContent = Math.max(98, current + delta);
             }, 6000);
         }
 
         function loadFromStorage() {
-            try {
-                const saved = localStorage.getItem('nsysu_towing_alerts_v1');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed)) {
-                        alerts = parsed;
-                        return;
-                    }
+            const saved = localStorage.getItem('nsysu_towing_alerts_v1');
+            if (saved) {
+                try {
+                    alerts = JSON.parse(saved);
+                    return;
+                } catch (e) {
+                    console.error('Failed to parse saved alerts', e);
                 }
-            } catch (e) {
-                console.warn('Failed to load alerts from storage:', e);
             }
 
             const now = Date.now();
@@ -610,8 +555,8 @@
                 {
                     id: 'alert-init-1',
                     zoneId: 'engineering',
-                    tag: '正在開單 / 拖吊',
-                    note: '白色貨車式拖吊車停在電資大樓紅線旁，已經在拍照了！',
+                    tag: '正在開單/上架',
+                    note: '白色小貨車式拖吊車停在電資大樓紅線旁，已經在拍照了！',
                     createdAt: now - (3 * 60 * 1000 + 20 * 1000),
                     confirmations: 8,
                     status: 'active'
@@ -631,15 +576,11 @@
         }
 
         function saveToStorage() {
-            try {
-                localStorage.setItem('nsysu_towing_alerts_v1', JSON.stringify(alerts));
-            } catch (e) {
-                console.warn('Failed to save alerts:', e);
-            }
+            localStorage.setItem('nsysu_towing_alerts_v1', JSON.stringify(alerts));
         }
 
         // ==========================================
-        // 3. Web Audio API Alert Tone
+        // 3. Web Audio API Synthesized Emergency Siren
         // ==========================================
         function playEmergencyTone() {
             if (!soundEnabled) return;
@@ -647,26 +588,21 @@
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 const ctx = new AudioCtx();
                 const now = ctx.currentTime;
-
                 const freqs = [880, 659.25, 987.77];
                 freqs.forEach((freq, idx) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(freq, now + idx * 0.14);
-
                     gain.gain.setValueAtTime(0.001, now + idx * 0.14);
                     gain.gain.exponentialRampToValueAtTime(0.25, now + idx * 0.14 + 0.03);
                     gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.13);
-
                     osc.connect(gain);
                     gain.connect(ctx.destination);
                     osc.start(now + idx * 0.14);
                     osc.stop(now + idx * 0.14 + 0.14);
                 });
-            } catch (e) {
-                // Ignore audio errors when gesture is pending
-            }
+            } catch (e) {}
         }
 
         function toggleSound() {
@@ -680,14 +616,12 @@
         function requestNotificationPermission() {
             const dot = document.getElementById('notify-dot');
             const label = document.getElementById('notify-label');
-
             if (!('Notification' in window)) {
                 dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
                 label.textContent = '模擬推播中';
                 showToast('🔔 已啟用應用程式內即時推播通知');
                 return;
             }
-
             Notification.requestPermission().then((perm) => {
                 if (perm === 'granted') {
                     dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
@@ -696,13 +630,13 @@
                 } else {
                     dot.className = 'w-2 h-2 rounded-full bg-sky-400 shrink-0';
                     label.textContent = '站內提醒中';
-                    showToast('ℹ️ 已改以站內橫幅推播提醒');
+                    showToast('ℹ️ 瀏覽器權限未開啟，將改以站內橫幅與 LINE 推播提醒');
                 }
             });
         }
 
         // ==========================================
-        // 4. Reporting & Anti-Spam Cooldown
+        // 4. Reporting & Anti-Spam Cooldown Logic
         // ==========================================
         function openReportModal(preselectZoneId = null) {
             selectedZoneId = preselectZoneId;
@@ -719,9 +653,9 @@
             const grid = document.getElementById('zone-grid');
             grid.innerHTML = CAMPUS_ZONES.map(zone => `
                 <button type="button" data-zone="${zone.id}" onclick="selectZone('${zone.id}')"
-                    class="zone-card w-full min-w-0 text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition active:scale-[0.98]">
+                    class="zone-card text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition active:scale-[0.98] min-w-0">
                     <div class="flex items-center gap-1.5 min-w-0">
-                        <span class="text-lg sm:text-xl shrink-0">${zone.icon}</span>
+                        <span class="text-lg shrink-0">${zone.icon}</span>
                         <span class="text-xs font-extrabold text-white leading-snug truncate">${zone.name}</span>
                     </div>
                     <p class="text-[11px] text-slate-400 mt-1 truncate">${zone.sub}</p>
@@ -738,8 +672,8 @@
             document.querySelectorAll('.zone-card').forEach(card => {
                 const isSelected = card.dataset.zone === selectedZoneId;
                 card.className = isSelected
-                    ? 'zone-card w-full min-w-0 text-left p-2.5 sm:p-3 rounded-2xl border-2 border-red-500 bg-red-500/15 shadow-lg shadow-red-950/40 transition'
-                    : 'zone-card w-full min-w-0 text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition';
+                    ? 'zone-card text-left p-2.5 sm:p-3 rounded-2xl border-2 border-red-500 bg-red-500/15 shadow-lg shadow-red-950/40 transition min-w-0'
+                    : 'zone-card text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition min-w-0';
             });
 
             const submitBtn = document.getElementById('btn-submit-report');
@@ -761,7 +695,7 @@
             btn.className = 'tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate';
         }
 
-        function submitReport() {
+        async function submitReport() {
             if (!selectedZoneId) return;
             const now = Date.now();
             const zone = CAMPUS_ZONES.find(z => z.id === selectedZoneId);
@@ -781,11 +715,11 @@
                 confirmedIds.add(existingActive.id);
                 saveToStorage();
                 renderAll();
-                showToast(`🛡️ 該區 5 分鐘內已有警報！已自動為您「+1 確認目擊」`);
+                showToast('🛡️ 該區 5 分鐘內已有警報！已自動為您「+1 確認目擊」避免洗版');
                 return;
             }
 
-            const finalNote = note || `${selectedTag} — 請附近同學留意！`;
+            const finalNote = note || `${zone.name}發現車管會拖吊車，請附近同學注意！`;
             const newAlert = {
                 id: 'alert-' + now,
                 zoneId: selectedZoneId,
@@ -800,28 +734,25 @@
             confirmedIds.add(newAlert.id);
             saveToStorage();
             renderAll();
-            triggerVisualAndAudioAlert(zone, newAlert.note);
+            triggerVisualAndAudioAlert(zone, finalNote);
 
-            // Dispatch live LINE broadcast via Google Apps Script
-            sendLineBroadcast(zone.name, `${selectedTag}${note ? '（' + note + '）' : ''}`, 'report').then((sent) => {
-                if (sent) {
-                    showToast('📲 已同步發送 LINE 推播給全校同學！');
-                }
-            });
+            const lineDetail = `【${selectedTag}】${finalNote}`;
+            const sent = await sendLineBroadcast(zone.name, lineDetail, 'report');
+            if (sent) {
+                showToast('📲 已同步發送 LINE 推播通知給全體好友！');
+            }
         }
 
         // ==========================================
-        // 5. Alert Actions & Simulations
+        // 5. Alert Interactions (+1 Confirm, Mark Cleared, Simulate)
         // ==========================================
         function confirmSighting(alertId) {
             const alert = alerts.find(a => a.id === alertId);
             if (!alert || alert.status !== 'active') return;
-
             if (confirmedIds.has(alertId)) {
                 showToast('👍 您已經確認過這則通報囉！');
                 return;
             }
-
             alert.confirmations += 1;
             confirmedIds.add(alertId);
             saveToStorage();
@@ -829,19 +760,19 @@
             showToast('✅ 已 +1 確認現場目擊，感謝回報！');
         }
 
-        function markCleared(alertId) {
+        async function markCleared(alertId) {
             const alert = alerts.find(a => a.id === alertId);
             if (!alert || alert.status !== 'active') return;
 
-            const zone = CAMPUS_ZONES.find(z => z.id === alert.zoneId) || CAMPUS_ZONES[0];
             alert.status = 'cleared';
             alert.clearedAt = Date.now();
             saveToStorage();
             renderAll();
 
-            sendLineBroadcast(zone.name, '現場同學回報拖吊車已離開，警報解除！', 'cleared').then((sent) => {
-                showToast(sent ? '🟢 已解除警報並發送 LINE 解除通知！' : '🟢 已回報「拖車已離開」，警報解除！');
-            });
+            const zone = CAMPUS_ZONES.find(z => z.id === alert.zoneId);
+            const zoneName = zone ? zone.name : '校內區域';
+            showToast('🟢 已回報「拖車已離開」，警報解除！');
+            await sendLineBroadcast(zoneName, '同學回報拖吊車已離開現場，解除警戒', 'cleared');
         }
 
         function simulateIncomingAlert() {
@@ -877,7 +808,6 @@
 
         function triggerVisualAndAudioAlert(zone, note) {
             playEmergencyTone();
-
             const shell = document.getElementById('app-shell');
             shell.classList.remove('animate-flash-red');
             void shell.offsetWidth;
@@ -896,11 +826,7 @@
             }, 4200);
 
             if ('Notification' in window && Notification.permission === 'granted') {
-                try {
-                    new Notification(`🚨 中山拖吊警報：${zone.name}`, { body: note });
-                } catch (e) {
-                    // Ignore notification errors in restricted contexts
-                }
+                new Notification(`🚨 中山拖吊警報：${zone.name}`, { body: note });
             }
         }
 
@@ -922,7 +848,7 @@
         }
 
         // ==========================================
-        // 6. UI Rendering
+        // 6. Rendering UI (Radar Map, Feed, Badges)
         // ==========================================
         function renderAll() {
             updateHeaderBadges();
@@ -937,12 +863,12 @@
 
             if (activeCount > 0) {
                 globalPill.className = 'px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-[11px] animate-pulse shrink-0';
-                globalPill.textContent = `⚠️ 校內警戒中 (${activeCount})`;
+                globalPill.textContent = `⚠️ 校內警戒中 (${activeCount} 處通報)`;
                 feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0';
                 feedBadge.textContent = `${activeCount} 則進行中`;
             } else {
                 globalPill.className = 'px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[11px] shrink-0';
-                globalPill.textContent = '✅ 全校安全';
+                globalPill.textContent = '✅ 目前全校安全無拖吊';
                 feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0';
                 feedBadge.textContent = '0 則進行中';
             }
@@ -976,7 +902,7 @@
                             stroke="${isFiltered ? '#FFFFFF' : '#0F172A'}"
                             stroke-width="2"/>
                         <rect x="${zone.x - 28}" y="${zone.y + 9}" width="56" height="14" rx="4"
-                            fill="${isAlert ? '#7F1D1D' : '#1E293B'}" opacity="0.92"/>
+                            fill="${isAlert ? '#7F1D1D' : '#1E293B'}" opacity="0.9"/>
                         <text x="${zone.x}" y="${zone.y + 19}" text-anchor="middle"
                             fill="${isAlert ? '#FCA5A5' : '#CBD5E1'}"
                             font-size="8.5" font-weight="700">
@@ -997,7 +923,7 @@
 
             if (filtered.length === 0) {
                 feedEl.innerHTML = `
-                    <div class="rounded-2xl border border-slate-800 bg-slate-800/30 p-7 text-center">
+                    <div class="rounded-2xl border border-slate-800 bg-slate-800/30 p-8 text-center">
                         <div class="text-3xl mb-2">🛵</div>
                         <p class="text-sm font-bold text-slate-300">此區域目前沒有拖吊通報</p>
                         <p class="text-xs text-slate-500 mt-1">請大家依然遵守校內停車規定，停放於合法車格內</p>
@@ -1017,7 +943,7 @@
 
                 if (isActive) {
                     return `
-                        <article class="w-full min-w-0 rounded-2xl bg-gradient-to-b from-red-950/50 to-slate-800/90 border border-red-500/40 p-4 shadow-lg transition-all">
+                        <article class="rounded-2xl bg-gradient-to-b from-red-950/50 to-slate-800/90 border border-red-500/40 p-3.5 sm:p-4 shadow-lg transition-all min-w-0">
                             <div class="flex items-start justify-between gap-2 min-w-0">
                                 <div class="flex items-center gap-2.5 min-w-0">
                                     <span class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-xl shrink-0">
@@ -1026,15 +952,15 @@
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <h4 class="text-sm font-black text-white truncate">${zone.name}</h4>
-                                            <span class="px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 text-[10px] font-bold border border-red-500/30 truncate">
+                                            <span class="px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 text-[10px] font-bold border border-red-500/30 shrink-0">
                                                 ${alert.tag}
                                             </span>
                                         </div>
-                                        <p class="text-[11px] text-slate-400 mt-0.5 truncate">${elapsedMin} 分鐘前 • 剩餘 ${remMin}:${remSec} 自動解除</p>
+                                        <p class="text-[11px] text-slate-400 mt-0.5 truncate">${elapsedMin} 分鐘前通報 • 剩餘 ${remMin}:${remSec} 自動解除</p>
                                     </div>
                                 </div>
-                                <span class="relative flex h-2.5 w-2.5 shrink-0 mt-1">
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span class="flex h-2.5 w-2.5 shrink-0 mt-1">
+                                    <span class="animate-ping absolute inline-flex h-2.5 w-2.5 rounded-full bg-red-400 opacity-75"></span>
                                     <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                                 </span>
                             </div>
@@ -1043,14 +969,14 @@
                                 「${escapeHtml(alert.note)}」
                             </p>
 
-                            <div class="mt-3 flex items-center gap-2 w-full">
+                            <div class="mt-3 flex items-center gap-2">
                                 <button type="button" onclick="confirmSighting('${alert.id}')"
-                                    class="flex-1 min-w-0 py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1 transition active:scale-95 truncate
+                                    class="flex-1 py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1 transition active:scale-95 min-w-0
                                     ${isConfirmedByMe
                                         ? 'bg-amber-500/25 border border-amber-400/50 text-amber-200'
                                         : 'bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white'}">
-                                    <span>👀</span>
-                                    <span class="truncate">${isConfirmedByMe ? '已確認目擊' : '+1 看到了'} (${alert.confirmations})</span>
+                                    <span class="shrink-0">👀</span>
+                                    <span class="truncate">${isConfirmedByMe ? '已確認' : '+1 看到了'} (${alert.confirmations})</span>
                                 </button>
                                 <button type="button" onclick="markCleared('${alert.id}')"
                                     class="py-2 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1 transition active:scale-95 shrink-0 whitespace-nowrap">
@@ -1061,19 +987,21 @@
                     `;
                 } else {
                     return `
-                        <article class="w-full min-w-0 rounded-2xl bg-slate-800/40 border border-slate-800 p-3.5 opacity-75">
-                            <div class="flex items-center gap-2.5 min-w-0">
-                                <span class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg grayscale shrink-0">
-                                    ${zone.icon}
-                                </span>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <h4 class="text-xs font-bold text-slate-300 truncate">${zone.name}</h4>
-                                        <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold shrink-0">
-                                            已撤離 / 解除
-                                        </span>
+                        <article class="rounded-2xl bg-slate-800/40 border border-slate-800 p-3.5 opacity-75 min-w-0">
+                            <div class="flex items-center justify-between gap-2 min-w-0">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg grayscale shrink-0">
+                                        ${zone.icon}
+                                    </span>
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <h4 class="text-xs font-bold text-slate-300 truncate">${zone.name}</h4>
+                                            <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold shrink-0">
+                                                已撤離 / 解除
+                                            </span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 mt-0.5 truncate">${elapsedMin} 分鐘前通報 • 累計 ${alert.confirmations} 人確認</p>
                                     </div>
-                                    <p class="text-[11px] text-slate-500 mt-0.5 truncate">${elapsedMin} 分鐘前 • 累計 ${alert.confirmations} 人確認</p>
                                 </div>
                             </div>
                         </article>
@@ -1087,15 +1015,15 @@
         // ==========================================
         let toastTimer = null;
         function showToast(message) {
-            const inner = document.getElementById('toast-inner');
-            inner.textContent = message;
-            inner.classList.remove('opacity-0', 'translate-y-2');
-            inner.classList.add('opacity-100', 'translate-y-0');
+            const toastInner = document.getElementById('toast-inner');
+            toastInner.textContent = message;
+            toastInner.classList.remove('opacity-0', 'translate-y-2');
+            toastInner.classList.add('opacity-100', 'translate-y-0');
 
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => {
-                inner.classList.remove('opacity-100', 'translate-y-0');
-                inner.classList.add('opacity-0', 'translate-y-2');
+                toastInner.classList.remove('opacity-100', 'translate-y-0');
+                toastInner.classList.add('opacity-0', 'translate-y-2');
             }, 3000);
         }
 

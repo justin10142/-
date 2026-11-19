@@ -68,6 +68,25 @@
             transform: scale(0.97);
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
         }
+        /* 修正手機版彈出選單與外層水平溢出 */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 針對底部彈出式選單 / Modal / Sheet 強制貼齊螢幕寬度 */
+[class*="sheet"],
+[class*="modal"],
+[class*="drawer"],
+[class*="popup"],
+[class*="panel"] {
+  left: 0 !important;
+  right: 0 !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transform: translateX(0) !important;
+}
     </style>
 </head>
 <body class="min-h-screen flex justify-center bg-slate-950 font-sans antialiased">

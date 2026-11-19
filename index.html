@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#0F172A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="中山拖吊警報">
     <title>中山車管會拖吊警報器 | 西子灣即時互助系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,10 +21,15 @@
                     },
                     animation: {
                         'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'slide-up': 'slideUp 0.24s ease-out forwards',
+                        'radar-ping': 'radarPing 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                        'slide-up': 'slideUp 0.25s ease-out forwards',
                         'flash-red': 'flashRed 0.6s ease-out',
                     },
                     keyframes: {
+                        radarPing: {
+                            '0%': { transform: 'scale(0.8)', opacity: '0.9' },
+                            '75%, 100%': { transform: 'scale(2.4)', opacity: '0' },
+                        },
                         slideUp: {
                             '0%': { transform: 'translateY(100%)', opacity: '0' },
                             '100%': { transform: 'translateY(0)', opacity: '1' },
@@ -40,25 +44,14 @@
         }
     </script>
     <style>
-        /* Ensure strict box-sizing and prevent horizontal overflow across all mobile viewports */
-        *, *::before, *::after {
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            max-width: 100vw;
-            overflow-x: hidden;
+        body {
             background-color: #020617;
             color: #F8FAFC;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
-            margin: 0;
-            padding: 0;
         }
-        /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 4px;
-            height: 4px;
         }
         ::-webkit-scrollbar-track {
             background: #0F172A;
@@ -71,52 +64,36 @@
             box-shadow: 0 0 30px rgba(239, 68, 68, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.3);
         }
         .sos-glow:active {
-            transform: scale(0.98);
+            transform: scale(0.97);
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
-        }
-        /* Bottom sheet container strictly aligned within 100vw on mobile */
-        .bottom-sheet-panel {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100%;
-            max-width: 100vw;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        @media (min-width: 480px) {
-            .bottom-sheet-panel {
-                max-width: 480px;
-            }
         }
     </style>
 </head>
 <body class="min-h-screen flex justify-center bg-slate-950 font-sans antialiased">
 
-    <!-- Mobile-First App Shell (Full width on mobile, capped cleanly at 480px on desktop) -->
-    <div id="app-shell" class="w-full max-w-full sm:max-w-[480px] min-h-screen bg-slate-900 sm:border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
+    <!-- Mobile-First App Shell -->
+    <div id="app-shell" class="w-full max-w-[480px] min-h-screen bg-slate-900 border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
 
         <!-- Incoming Push Banner Notification -->
-        <div id="push-banner" class="fixed top-3 left-0 right-0 z-50 px-3 pointer-events-none opacity-0 -translate-y-6 transition-all duration-300 flex justify-center">
-            <div class="w-full max-w-[456px] bg-slate-800/95 backdrop-blur-md border border-red-500/60 rounded-2xl p-3.5 shadow-2xl flex items-start gap-3 min-w-0">
+        <div id="push-banner" class="fixed top-3 left-1/2 -translate-x-1/2 w-[92%] max-w-[445px] z-50 pointer-events-none opacity-0 -translate-y-6 transition-all duration-300">
+            <div class="bg-slate-800/95 backdrop-blur-md border border-red-500/60 rounded-2xl p-3.5 shadow-2xl flex items-start gap-3">
                 <div class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 text-xl animate-bounce">
                     🚨
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-xs font-bold text-red-400 tracking-wide uppercase truncate">中山車管會緊急推播</span>
-                        <span class="text-[11px] text-slate-400 shrink-0">剛剛</span>
+                        <span class="text-xs font-bold text-red-400 tracking-wide uppercase">中山車管會緊急推播</span>
+                        <span class="text-[11px] text-slate-400">剛剛</span>
                     </div>
-                    <p id="push-banner-title" class="text-sm font-bold text-white truncate mt-0.5">工學院 發現拖吊車！</p>
+                    <p id="push-banner-title" class="text-sm font-bold text-white truncate mt-0.5">發現拖吊車！</p>
                     <p id="push-banner-desc" class="text-xs text-slate-300 truncate mt-0.5">請停在紅線或機慢車道旁的同學儘速移車！</p>
                 </div>
             </div>
         </div>
 
         <!-- Top Header & Live Status Bar -->
-        <header class="sticky top-0 z-30 w-full bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 pt-3.5 pb-3">
-            <div class="flex items-center justify-between gap-2 min-w-0">
+        <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 pt-3.5 pb-3">
+            <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2.5 min-w-0">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-700 flex items-center justify-center shadow-lg shadow-red-950/50 shrink-0">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
@@ -127,20 +104,21 @@
                         <h1 class="text-base font-black tracking-tight text-white leading-tight truncate">
                             中山車管會拖吊警報器
                         </h1>
-                        <p class="text-[11px] text-slate-400 font-medium truncate">西子灣即時互助通報系統 v1.1</p>
+                        <p class="text-[11px] text-slate-400 font-medium truncate">西子灣即時互助通報系統 v1.2</p>
                     </div>
                 </div>
 
-                <!-- Sound & Push Notification Toggle -->
+                <!-- Settings, Sound & LINE Status -->
                 <div class="flex items-center gap-1.5 shrink-0">
-                    <button id="btn-webhook-settings" type="button" onclick="openSettingsModal()" title="設定 LINE 推播網址" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95 relative">
+                    <button id="btn-webhook-settings" onclick="openWebhookModal()" title="設定 LINE 推播中繼網址" class="relative p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        <span id="webhook-status-dot" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900"></span>
+                        <span id="webhook-indicator" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
                     </button>
-                    <button id="btn-sound-toggle" type="button" onclick="toggleSound()" title="切換警報音效" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition active:scale-95">
+
+                    <button id="btn-sound-toggle" onclick="toggleSound()" title="切換警報音效" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition active:scale-95">
                         <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
                         </svg>
@@ -148,50 +126,51 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
                         </svg>
                     </button>
-                    <div id="line-auto-badge" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-xs font-bold text-emerald-300 flex items-center gap-1.5 whitespace-nowrap">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-                        <span>LINE 推播就緒</span>
-                    </div>
+
+                    <button id="btn-line-badge" onclick="openWebhookModal()" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-xs font-bold text-emerald-300 flex items-center gap-1.5 transition active:scale-95">
+                        <span id="line-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span id="line-status-label">LINE 推播就緒</span>
+                    </button>
                 </div>
             </div>
 
             <!-- Live Campus Telemetry Bar -->
-            <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs min-w-0">
-                <div class="flex items-center gap-1.5 text-emerald-400 font-medium truncate">
+            <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2">
+                <div class="flex items-center gap-1.5 text-emerald-400 font-medium min-w-0">
                     <span class="relative flex h-2 w-2 shrink-0">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span class="truncate">自動推播已啟用・通報即通知全體好友</span>
+                    <span id="sync-status-text" class="truncate">雲端即時同步中・通報直發 LINE</span>
                 </div>
-                <div id="global-status-pill" class="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 font-bold text-[11px] shrink-0">
-                    ⚠️ 校內警戒中 (1 處通報)
+                <div id="global-status-pill" class="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[11px] shrink-0">
+                    ✅ 目前全校安全無拖吊
                 </div>
             </div>
         </header>
 
         <!-- Main Scrollable Content -->
-        <main class="flex-1 w-full px-4 py-4 space-y-5 pb-8 min-w-0">
+        <main class="flex-1 px-4 py-4 space-y-5 pb-10">
 
             <!-- Primary One-Tap Emergency Button -->
-            <section aria-label="一鍵通報按鈕" class="w-full">
-                <button type="button" onclick="openReportModal()" class="w-full relative group overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 p-4 text-white sos-glow transition-all duration-150 border border-red-400/40">
+            <section aria-label="一鍵通報按鈕">
+                <button onclick="openReportModal()" class="w-full relative group overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 p-4 text-white sos-glow transition-all duration-150 border border-red-400/40">
                     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.22),transparent_60%)]"></div>
-                    <div class="relative flex items-center justify-between gap-2 min-w-0">
-                        <div class="flex items-center gap-3 text-left min-w-0">
-                            <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-2xl shrink-0">
+                    <div class="relative flex items-center justify-between">
+                        <div class="flex items-center gap-3.5 text-left">
+                            <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-3xl shrink-0">
                                 🚨
                             </div>
-                            <div class="min-w-0">
-                                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/25 text-[10px] font-bold tracking-wider uppercase mb-1">
+                            <div>
+                                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/25 text-[11px] font-bold tracking-wider uppercase mb-1">
                                     <span>SOS 緊急廣播</span>
                                 </div>
-                                <h2 class="text-lg sm:text-xl font-black tracking-tight leading-tight truncate">發現拖吊車！立即通報</h2>
-                                <p class="text-xs text-red-100 mt-1 font-medium truncate">點擊選擇校內區域，一秒通知全校同學</p>
+                                <h2 class="text-xl font-black tracking-tight leading-none">發現拖吊車！立即通報</h2>
+                                <p class="text-xs text-red-100 mt-1 font-medium">點擊選擇校內區域，一秒通知全校同學</p>
                             </div>
                         </div>
-                        <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:translate-x-0.5 transition-transform">
-                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:translate-x-0.5 transition-transform">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                             </svg>
                         </div>
@@ -200,23 +179,23 @@
             </section>
 
             <!-- Interactive NSYSU Campus Radar Map -->
-            <section class="w-full bg-slate-800/50 border border-slate-700/70 rounded-2xl p-3.5 min-w-0">
-                <div class="flex items-center justify-between gap-2 mb-2.5">
-                    <div class="flex items-center gap-1.5 min-w-0">
-                        <span class="text-sm shrink-0">🗺️</span>
-                        <h3 class="text-xs font-bold text-slate-200 tracking-wide uppercase truncate">西子灣校區即時熱點雷達</h3>
+            <section class="bg-slate-800/50 border border-slate-700/70 rounded-2xl p-3.5">
+                <div class="flex items-center justify-between mb-2.5">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-sm">🗺️</span>
+                        <h3 class="text-xs font-bold text-slate-200 tracking-wide uppercase">西子灣校區即時熱點雷達</h3>
                     </div>
-                    <button id="btn-reset-filter" type="button" onclick="setZoneFilter('all')" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hidden shrink-0">
+                    <button id="btn-reset-filter" onclick="setZoneFilter('all')" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hidden">
                         顯示全部區域
                     </button>
                 </div>
 
                 <!-- Stylized Interactive SVG Map of NSYSU -->
                 <div class="relative w-full h-44 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden select-none">
-                    <svg viewBox="0 0 400 180" preserveAspectRatio="xMidYMid slice" class="w-full h-full block">
+                    <svg viewBox="0 0 400 180" class="w-full h-full">
                         <!-- Ocean / Xiziwan Bay -->
                         <path d="M0,0 L125,0 C110,45 95,90 120,135 C135,160 175,168 230,180 L0,180 Z" fill="#0C2D48" opacity="0.75"/>
-                        <text x="20" y="156" fill="#38BDF8" opacity="0.5" font-size="9.5" font-weight="700" letter-spacing="1">台灣海峽 / 西子灣海域</text>
+                        <text x="24" y="155" fill="#38BDF8" opacity="0.45" font-size="10" font-weight="700" letter-spacing="1">台灣海峽 / 西子灣海域</text>
 
                         <!-- Chaishan Mountain / Green Campus Area -->
                         <path d="M125,0 L400,0 L400,180 L230,180 C175,168 135,160 120,135 C95,90 110,45 125,0 Z" fill="#0F172A"/>
@@ -232,7 +211,7 @@
                         <!-- Zone Hotspots -->
                         <g id="map-hotspots"></g>
                     </svg>
-                    <div class="absolute bottom-2 right-2.5 flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-sm px-2 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300">
+                    <div class="absolute bottom-2 right-2.5 flex items-center gap-2.5 bg-slate-900/85 backdrop-blur-sm px-2 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>拖吊警戒</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>安全無虞</span>
                     </div>
@@ -240,249 +219,172 @@
             </section>
 
             <!-- Live Alert Feed Section -->
-            <section class="w-full space-y-3 min-w-0">
-                <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2 min-w-0">
-                        <h3 class="text-sm font-extrabold text-white tracking-tight truncate">即時通報動態</h3>
-                        <span id="active-count-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0">1 則進行中</span>
+            <section class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-extrabold text-white tracking-tight">即時通報動態</h3>
+                        <span id="active-count-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">0 則進行中</span>
                     </div>
-                    <span class="text-[11px] text-slate-400 shrink-0">15 分鐘自動解除</span>
+                    <button onclick="fetchRemoteAlerts(true)" class="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition">
+                        <span>🔄 立即更新</span>
+                    </button>
                 </div>
 
                 <!-- Alert Cards Container -->
-                <div id="alert-feed" class="w-full space-y-3 min-w-0">
-                    <!-- Populated via JavaScript -->
-                </div>
+                <div id="alert-feed" class="space-y-3"></div>
             </section>
 
         </main>
 
-        <!-- Quick-Select Report Modal / Bottom Sheet (Strictly 100vw & zero horizontal overflow) -->
-        <div id="report-modal" class="fixed inset-0 z-50 hidden w-screen max-w-[100vw] overflow-x-hidden">
-            <!-- Backdrop -->
+        <!-- Quick-Select Report Modal -->
+        <div id="report-modal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center">
             <div onclick="closeReportModal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"></div>
 
-            <!-- Bottom Sheet Panel -->
-            <div class="bottom-sheet-panel bg-slate-900 border-t border-slate-700 rounded-t-3xl p-4 sm:p-5 shadow-2xl animate-slide-up max-h-[88vh] overflow-y-auto overflow-x-hidden">
-                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3.5"></div>
+            <div class="relative z-10 w-full max-w-[480px] bg-slate-900 border-t sm:border border-slate-700 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-slide-up max-h-[92vh] overflow-y-auto">
+                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3 sm:hidden"></div>
 
-                <div class="flex items-start justify-between gap-2 mb-3 min-w-0">
-                    <div class="min-w-0">
-                        <h2 class="text-base sm:text-lg font-black text-white flex items-center gap-1.5 truncate">
+                <div class="flex items-center justify-between mb-2.5">
+                    <div>
+                        <h2 class="text-lg font-black text-white flex items-center gap-2">
                             <span>🚨 選擇發現拖吊車位置</span>
                         </h2>
-                        <p class="text-xs text-slate-400 mt-0.5">點擊區域即可立即推播給全校線上同學</p>
+                        <p class="text-xs text-slate-400 mt-0.5">點擊區域即可同步推播至全校與 LINE 機器人</p>
                     </div>
-                    <button type="button" onclick="closeReportModal()" aria-label="關閉視窗" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center shrink-0">
+                    <button onclick="closeReportModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
                         ✕
                     </button>
                 </div>
 
-                <!-- Hotspot Grid (2 columns on mobile with proper min-w-0 to prevent overflow) -->
-                <div id="zone-grid" class="grid grid-cols-2 gap-2 my-3 w-full">
-                    <!-- Populated by JS -->
-                </div>
+                <!-- Hotspot Grid -->
+                <div id="zone-grid" class="grid grid-cols-2 gap-2 my-2.5"></div>
 
                 <!-- Quick Urgency Tags -->
-                <div class="mt-3.5 w-full min-w-0">
-                    <label class="block text-xs font-bold text-slate-300 mb-2">現場狀況快選（選填）</label>
-                    <div id="tag-selector" class="flex flex-wrap gap-1.5 w-full">
-                        <button type="button" onclick="selectTag(this, '拖車巡邏移動中')" class="tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate">
+                <div class="mt-3">
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">現場狀況快選（選填）</label>
+                    <div id="tag-selector" class="flex flex-wrap gap-1.5">
+                        <button type="button" onclick="selectTag(this, '拖車巡邏移動中')" class="tag-btn active px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition">
                             🚛 拖車巡邏移動中
                         </button>
-                        <button type="button" onclick="selectTag(this, '正在開單/上架')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
-                            📸 正在開單/上架
+                        <button type="button" onclick="selectTag(this, '正在開單 / 準備上夾')" class="tag-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition">
+                            📸 正在開單 / 準備上夾
                         </button>
-                        <button type="button" onclick="selectTag(this, '貨車式吊車出沒')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
+                        <button type="button" onclick="selectTag(this, '貨車式吊車出沒')" class="tag-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition">
                             🏗️ 貨車式吊車出沒
                         </button>
                     </div>
                 </div>
 
                 <!-- Optional Short Note -->
-                <div class="mt-3 w-full min-w-0">
-                    <input id="custom-note" type="text" maxlength="40" placeholder="補充說明（例如：往海堤方向開過去了...）" class="w-full max-w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
+                <div class="mt-3">
+                    <input id="custom-note" type="text" maxlength="40" placeholder="補充說明（例如：往海堤方向開過去了...）" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
                 </div>
 
                 <!-- Submit Action -->
-                <button id="btn-submit-report" type="button" onclick="submitReport()" class="w-full max-w-full mt-3.5 py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm sm:text-base shadow-lg shadow-red-950/60 transition active:scale-[0.98] truncate">
+                <button id="btn-submit-report" onclick="submitReport()" class="w-full mt-3.5 py-3.5 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base shadow-lg shadow-red-950/60 transition active:scale-[0.98]">
                     請先選擇上方區域
                 </button>
             </div>
         </div>
 
-        <!-- LINE Webhook Settings Modal -->
-        <div id="settings-modal" class="fixed inset-0 z-50 hidden w-screen max-w-[100vw] overflow-x-hidden">
-            <div onclick="closeSettingsModal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"></div>
-            <div class="bottom-sheet-panel bg-slate-900 border-t border-slate-700 rounded-t-3xl p-4 sm:p-5 shadow-2xl animate-slide-up max-h-[85vh] overflow-y-auto overflow-x-hidden">
-                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3.5"></div>
-                <div class="flex items-start justify-between gap-2 mb-3 min-w-0">
-                    <div class="min-w-0">
-                        <h2 class="text-base sm:text-lg font-black text-white flex items-center gap-1.5 truncate">
-                            <span>🔗 LINE 推播中繼站設定</span>
+        <!-- LINE Webhook Configuration Modal -->
+        <div id="webhook-modal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center">
+            <div onclick="closeWebhookModal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"></div>
+
+            <div class="relative z-10 w-full max-w-[480px] bg-slate-900 border-t sm:border border-slate-700 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-slide-up max-h-[92vh] overflow-y-auto">
+                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3 sm:hidden"></div>
+
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h2 class="text-lg font-black text-white flex items-center gap-2">
+                            <span>🔗 LINE 推播與雲端中繼站</span>
                         </h2>
-                        <p class="text-xs text-slate-400 mt-0.5">貼上 Google Apps Script 部署的 <code class="text-sky-400">/exec</code> 網址</p>
+                        <p class="text-xs text-slate-400 mt-0.5">已內建預設 Google Apps Script 網址，可在此測試推播</p>
                     </div>
-                    <button type="button" onclick="closeSettingsModal()" aria-label="關閉設定" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center shrink-0">
+                    <button onclick="closeWebhookModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
                         ✕
                     </button>
                 </div>
 
-                <div class="space-y-3 mt-3">
+                <div class="space-y-3 my-3">
                     <div>
-                        <label for="webhook-url-input" class="block text-xs font-bold text-slate-300 mb-1.5">Google Apps Script 網頁應用程式網址</label>
-                        <input id="webhook-url-input" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full max-w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono">
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">Google Apps Script 網頁應用程式網址</label>
+                        <input id="webhook-url-input" type="url" placeholder="https://script.google.com/macros/s/你的部署網址/exec" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
                     </div>
 
-                    <div id="webhook-status-box" class="rounded-xl bg-slate-800/70 border border-slate-700/80 p-3 text-xs text-slate-300 leading-relaxed">
-                        尚未設定網址。填入後，每次發送或解除拖吊警報都會自動呼叫 LINE 機器人廣播推播給全體好友。
+                    <div id="webhook-current-status" class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300">
+                        狀態檢查中...
                     </div>
+                </div>
 
-                    <div class="flex items-center gap-2 pt-1">
-                        <button type="button" onclick="testLineWebhook()" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 text-xs font-extrabold transition active:scale-95">
-                            📡 發送測試推播
-                        </button>
-                        <button type="button" onclick="saveWebhookSettings()" class="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-950/50 transition active:scale-95">
-                            💾 儲存網址
-                        </button>
-                    </div>
+                <div class="grid grid-cols-2 gap-2.5 mt-4">
+                    <button type="button" onclick="testLineWebhook()" class="py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs transition active:scale-[0.98]">
+                        📡 發送測試推播
+                    </button>
+                    <button type="button" onclick="saveWebhookSettings()" class="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-950/50 transition active:scale-[0.98]">
+                        💾 儲存網址
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Toast Feedback Message -->
-        <div id="toast" class="fixed bottom-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
-            <div id="toast-inner" class="max-w-[92vw] px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-white text-xs font-bold shadow-2xl opacity-0 translate-y-2 transition-all duration-200 truncate">
-            </div>
+        <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-white text-xs font-bold shadow-2xl opacity-0 pointer-events-none transition-all duration-200 whitespace-nowrap max-w-[92vw] truncate">
         </div>
 
     </div>
 
     <script>
         // ==========================================
-        // 0. Google Apps Script LINE Broadcast Webhook
+        // 1. Google Apps Script Backend & LINE Webhook Configuration
         // ==========================================
-        // 已直接內建你的 Google Apps Script 部署網址 (/exec)，打開網頁即可自動連線推播
         const DEFAULT_GAS_LINE_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycby6FxCT2UrSsrn41CpK0mScJ7U91kb-jMGxxx4JQKtEB29d5W3K5PFQV7vtWdi_zHYpyA/exec';
         const WEBHOOK_STORAGE_KEY = 'nsysu_gas_line_webhook_url_v1';
+        const CONFIRMED_STORAGE_KEY = 'nsysu_confirmed_alert_ids_v1';
 
-        function getLineWebhookUrl() {
-            try {
-                const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
-                if (saved && saved.trim().startsWith('https://')) {
-                    return saved.trim();
-                }
-            } catch (e) {
-                console.warn('無法讀取儲存的 Webhook 網址:', e);
+        function getGasWebhookUrl() {
+            const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
+            if (saved && saved.trim() && !saved.includes('你的部署網址')) {
+                return saved.trim();
             }
-            return DEFAULT_GAS_LINE_WEBHOOK_URL;
+            return DEFAULT_GAS_LINE_WEBHOOK_URL.trim();
         }
 
         function isWebhookConfigured() {
-            const url = getLineWebhookUrl();
-            return Boolean(url && url.startsWith('https://'));
+            const url = getGasWebhookUrl();
+            return Boolean(url && url.startsWith('https://script.google.com/macros/s/') && !url.includes('你的部署網址'));
         }
 
-        function updateWebhookStatusUI() {
-            const dot = document.getElementById('webhook-status-dot');
-            const statusBox = document.getElementById('webhook-status-box');
-            const url = getLineWebhookUrl();
-            const configured = isWebhookConfigured();
+        async function postToGasBackend(payload) {
+            const webhookUrl = getGasWebhookUrl();
+            if (!isWebhookConfigured()) return { ok: false, reason: 'not_configured' };
 
-            if (dot) {
-                dot.className = configured
-                    ? 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900'
-                    : 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900';
-            }
-
-            if (statusBox) {
-                if (configured) {
-                    statusBox.innerHTML = `<span class="text-emerald-400 font-bold">✅ 已連線至 LINE 推播中繼站</span><br><span class="text-[11px] text-slate-400 break-all font-mono">${escapeHtml(url)}</span>`;
-                } else {
-                    statusBox.textContent = '尚未設定網址。填入後，每次發送或解除拖吊警報都會自動呼叫 LINE 機器人廣播推播給全體好友。';
-                }
-            }
-        }
-
-        function openSettingsModal() {
-            const input = document.getElementById('webhook-url-input');
-            const currentUrl = getLineWebhookUrl();
-            input.value = currentUrl || '';
-            updateWebhookStatusUI();
-            document.getElementById('settings-modal').classList.remove('hidden');
-        }
-
-        function closeSettingsModal() {
-            document.getElementById('settings-modal').classList.add('hidden');
-        }
-
-        function saveWebhookSettings() {
-            const input = document.getElementById('webhook-url-input');
-            const val = input.value.trim();
-            if (val && !val.startsWith('https://')) {
-                showToast('⚠️ 請輸入以 https:// 開頭的 Google Apps Script /exec 網址');
-                return;
-            }
             try {
-                if (val) {
-                    localStorage.setItem(WEBHOOK_STORAGE_KEY, val);
-                } else {
-                    localStorage.removeItem(WEBHOOK_STORAGE_KEY);
-                }
-            } catch (e) {
-                console.warn('無法儲存 Webhook 設定:', e);
-            }
-            updateWebhookStatusUI();
-            showToast('✅ LINE 推播中繼站網址已儲存！');
-        }
-
-        async function sendLineBroadcast(area, note, action = 'report') {
-            const targetUrl = getLineWebhookUrl();
-            if (!targetUrl || !targetUrl.startsWith('https://')) {
-                console.warn('尚未設定有效的 LINE 推播中繼站網址');
-                return false;
-            }
-            try {
-                await fetch(targetUrl, {
+                await fetch(webhookUrl, {
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        area: area || '未知區域',
-                        note: note || '發現拖吊車出沒',
-                        action: action
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
-                return true;
+                return { ok: true };
             } catch (err) {
-                console.error('LINE 推播發送失敗:', err);
-                return false;
+                console.error('GAS 後端請求失敗：', err);
+                return { ok: false, error: err };
             }
         }
 
+        // Backward-compatible helper aliases
+        async function sendLineBroadcast(area, note, action = 'report', extra = {}) {
+            return postToGasBackend({
+                area: area || '未知區域',
+                note: note || '發現拖吊車出沒',
+                action: action,
+                ...extra
+            });
+        }
         const pushAlertToLine = sendLineBroadcast;
 
-        async function testLineWebhook() {
-            const inputVal = document.getElementById('webhook-url-input').value.trim();
-            if (inputVal && inputVal.startsWith('https://')) {
-                try {
-                    localStorage.setItem(WEBHOOK_STORAGE_KEY, inputVal);
-                } catch (e) {}
-                updateWebhookStatusUI();
-            }
-            if (!isWebhookConfigured()) {
-                showToast('⚠️ 請先貼上有效的 https://.../exec 網址');
-                return;
-            }
-            showToast('📡 正在發送 LINE 測試推播...');
-            const ok = await sendLineBroadcast('測試連線', '中山車管會拖吊警報器 LINE 推播測試成功！', 'report');
-            showToast(ok ? '✅ 已送出測試請求，請確認手機 LINE 通知！' : '❌ 推播發送失敗，請檢查網址');
-        }
-
         // ==========================================
-        // 1. NSYSU Campus Hotspot Data & Coordinates
+        // 2. NSYSU Campus Hotspot Data & Coordinates
         // ==========================================
         const CAMPUS_ZONES = [
             { id: 'seawall', icon: '🌊', name: '海堤 / 體育館', sub: '蓮海路・海資館前', x: 118, y: 118 },
@@ -502,64 +404,177 @@
         let activeZoneFilter = 'all';
         let soundEnabled = true;
         let confirmedIds = new Set();
+        let isInitialLoading = true;
+        let knownActiveIds = new Set();
 
         // ==========================================
-        // 2. Initialization & Seed Data
+        // 3. Initialization & Cloud Sync
         // ==========================================
         function init() {
-            updateWebhookStatusUI();
-            loadFromStorage();
+            loadConfirmedIds();
             renderZoneSelector();
+            updateWebhookStatusUI();
             renderAll();
 
+            // Fetch real alerts immediately and poll every 8 seconds
+            fetchRemoteAlerts(false);
+            setInterval(() => fetchRemoteAlerts(false), 8000);
+
+            // Live countdown & expiration ticker every second
             setInterval(() => {
                 checkAutoExpiration();
                 renderAlertFeed();
             }, 1000);
         }
 
-        function loadFromStorage() {
-            const saved = localStorage.getItem('nsysu_towing_alerts_v1');
-            if (saved) {
-                try {
-                    alerts = JSON.parse(saved);
-                    return;
-                } catch (e) {
-                    console.error('Failed to parse saved alerts', e);
+        function loadConfirmedIds() {
+            try {
+                const raw = localStorage.getItem(CONFIRMED_STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) confirmedIds = new Set(parsed);
                 }
+            } catch (e) {
+                confirmedIds = new Set();
             }
-
-            const now = Date.now();
-            alerts = [
-                {
-                    id: 'alert-init-1',
-                    zoneId: 'engineering',
-                    tag: '正在開單/上架',
-                    note: '白色小貨車式拖吊車停在電資大樓紅線旁，已經在拍照了！',
-                    createdAt: now - (3 * 60 * 1000 + 20 * 1000),
-                    confirmations: 8,
-                    status: 'active'
-                },
-                {
-                    id: 'alert-init-2',
-                    zoneId: 'tunnel',
-                    tag: '拖車巡邏移動中',
-                    note: '剛剛從隧道口開出來往行政大樓方向去',
-                    createdAt: now - (22 * 60 * 1000),
-                    clearedAt: now - (9 * 60 * 1000),
-                    confirmations: 14,
-                    status: 'cleared'
-                }
-            ];
-            saveToStorage();
         }
 
-        function saveToStorage() {
-            localStorage.setItem('nsysu_towing_alerts_v1', JSON.stringify(alerts));
+        function saveConfirmedIds() {
+            localStorage.setItem(CONFIRMED_STORAGE_KEY, JSON.stringify(Array.from(confirmedIds).slice(-100)));
+        }
+
+        async function fetchRemoteAlerts(showFeedback = false) {
+            const webhookUrl = getGasWebhookUrl();
+            const syncLabel = document.getElementById('sync-status-text');
+
+            if (!isWebhookConfigured()) {
+                isInitialLoading = false;
+                syncLabel.textContent = '請點右上角齒輪設定 GAS 網址';
+                renderAll();
+                return;
+            }
+
+            try {
+                const res = await fetch(webhookUrl + '?t=' + Date.now(), {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+
+                const data = await res.json();
+                if (data && data.ok && Array.isArray(data.alerts)) {
+                    const prevKnown = new Set(knownActiveIds);
+                    const nextActiveIds = new Set();
+
+                    alerts = data.alerts.map(item => ({
+                        id: String(item.id),
+                        zoneId: String(item.zoneId),
+                        tag: String(item.tag || '拖車巡邏移動中'),
+                        note: String(item.note || '發現拖吊車出沒'),
+                        createdAt: Number(item.createdAt) || Date.now(),
+                        clearedAt: item.clearedAt ? Number(item.clearedAt) : null,
+                        confirmations: Math.max(1, Number(item.confirmations) || 1),
+                        status: item.status === 'cleared' ? 'cleared' : 'active'
+                    }));
+
+                    alerts.forEach(a => {
+                        if (a.status === 'active') {
+                            nextActiveIds.add(a.id);
+                            if (!isInitialLoading && !prevKnown.has(a.id)) {
+                                const zone = CAMPUS_ZONES.find(z => z.id === a.zoneId) || CAMPUS_ZONES[0];
+                                triggerVisualAndAudioAlert(zone, a.note);
+                            }
+                        }
+                    });
+
+                    knownActiveIds = nextActiveIds;
+                    isInitialLoading = false;
+                    syncLabel.textContent = '雲端即時同步中・通報直發 LINE';
+                    renderAll();
+                    if (showFeedback) showToast('🔄 已同步全校最新通報紀錄');
+                }
+            } catch (err) {
+                isInitialLoading = false;
+                syncLabel.textContent = '連線待命・通報直發 LINE';
+                renderAll();
+                if (showFeedback) showToast('⚠️ 尚未讀取到雲端資料（請確認 GAS 已部署新版 doGet）');
+            }
         }
 
         // ==========================================
-        // 3. Web Audio API Synthesized Emergency Siren
+        // 4. Webhook Settings UI Handlers
+        // ==========================================
+        function updateWebhookStatusUI() {
+            const configured = isWebhookConfigured();
+            const indicator = document.getElementById('webhook-indicator');
+            const dot = document.getElementById('line-status-dot');
+            const label = document.getElementById('line-status-label');
+            const badge = document.getElementById('btn-line-badge');
+            const statusBox = document.getElementById('webhook-current-status');
+
+            if (configured) {
+                indicator.className = 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                label.textContent = 'LINE 推播就緒';
+                badge.className = 'px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-xs font-bold text-emerald-300 flex items-center gap-1.5 transition active:scale-95';
+                if (statusBox) {
+                    statusBox.innerHTML = `<span class="text-emerald-400 font-bold">✅ 已連線至 LINE 與雲端資料庫</span><div class="text-[11px] text-slate-400 mt-1 break-all font-mono">${escapeHtml(getGasWebhookUrl())}</div>`;
+                }
+            } else {
+                indicator.className = 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900';
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                label.textContent = '未設推播網址';
+                badge.className = 'px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-xs font-bold text-amber-300 flex items-center gap-1.5 transition active:scale-95';
+                if (statusBox) {
+                    statusBox.innerHTML = `<span class="text-amber-300 font-bold">⚠️ 尚未設定 Google Apps Script 網址</span>`;
+                }
+            }
+        }
+
+        function openWebhookModal() {
+            document.getElementById('webhook-url-input').value = getGasWebhookUrl();
+            updateWebhookStatusUI();
+            document.getElementById('webhook-modal').classList.remove('hidden');
+        }
+
+        function closeWebhookModal() {
+            document.getElementById('webhook-modal').classList.add('hidden');
+        }
+
+        function saveWebhookSettings() {
+            const inputVal = document.getElementById('webhook-url-input').value.trim();
+            if (!inputVal.startsWith('https://script.google.com/macros/s/')) {
+                showToast('⚠️ 請貼上正確的 Google Apps Script /exec 網址');
+                return;
+            }
+            localStorage.setItem(WEBHOOK_STORAGE_KEY, inputVal);
+            updateWebhookStatusUI();
+            closeWebhookModal();
+            fetchRemoteAlerts(false);
+            showToast('✅ 已儲存推播中繼網址！');
+        }
+
+        async function testLineWebhook() {
+            const inputVal = document.getElementById('webhook-url-input').value.trim();
+            if (inputVal.startsWith('https://script.google.com/macros/s/')) {
+                localStorage.setItem(WEBHOOK_STORAGE_KEY, inputVal);
+                updateWebhookStatusUI();
+            }
+            if (!isWebhookConfigured()) {
+                showToast('⚠️ 請先貼上有效的 /exec 網址再測試');
+                return;
+            }
+            showToast('📡 正在發送測試推播至 LINE...');
+            await postToGasBackend({
+                area: '測試連線區域',
+                note: '中山車管會拖吊警報器 LINE 推播測試成功！',
+                action: 'test'
+            });
+            showToast('✅ 測試請求已送出，請檢查手機 LINE 通知！');
+        }
+
+        // ==========================================
+        // 5. Web Audio API Synthesized Emergency Siren
         // ==========================================
         function playEmergencyTone() {
             if (!soundEnabled) return;
@@ -567,15 +582,18 @@
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 const ctx = new AudioCtx();
                 const now = ctx.currentTime;
+
                 const freqs = [880, 659.25, 987.77];
                 freqs.forEach((freq, idx) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+
                     gain.gain.setValueAtTime(0.001, now + idx * 0.14);
                     gain.gain.exponentialRampToValueAtTime(0.25, now + idx * 0.14 + 0.03);
                     gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.13);
+
                     osc.connect(gain);
                     gain.connect(ctx.destination);
                     osc.start(now + idx * 0.14);
@@ -592,30 +610,8 @@
             if (soundEnabled) playEmergencyTone();
         }
 
-        function requestNotificationPermission() {
-            const dot = document.getElementById('notify-dot');
-            const label = document.getElementById('notify-label');
-            if (!('Notification' in window)) {
-                dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
-                label.textContent = '模擬推播中';
-                showToast('🔔 已啟用應用程式內即時推播通知');
-                return;
-            }
-            Notification.requestPermission().then((perm) => {
-                if (perm === 'granted') {
-                    dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
-                    label.textContent = '推播已開啟';
-                    showToast('✅ 系統推播通知已成功開啟！');
-                } else {
-                    dot.className = 'w-2 h-2 rounded-full bg-sky-400 shrink-0';
-                    label.textContent = '站內提醒中';
-                    showToast('ℹ️ 瀏覽器權限未開啟，將改以站內橫幅與 LINE 推播提醒');
-                }
-            });
-        }
-
         // ==========================================
-        // 4. Reporting & Anti-Spam Cooldown Logic
+        // 6. Reporting, +1 Confirm, & Clear Logic
         // ==========================================
         function openReportModal(preselectZoneId = null) {
             selectedZoneId = preselectZoneId;
@@ -632,10 +628,10 @@
             const grid = document.getElementById('zone-grid');
             grid.innerHTML = CAMPUS_ZONES.map(zone => `
                 <button type="button" data-zone="${zone.id}" onclick="selectZone('${zone.id}')"
-                    class="zone-card text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition active:scale-[0.98] min-w-0">
-                    <div class="flex items-center gap-1.5 min-w-0">
-                        <span class="text-lg shrink-0">${zone.icon}</span>
-                        <span class="text-xs font-extrabold text-white leading-snug truncate">${zone.name}</span>
+                    class="zone-card text-left p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition active:scale-[0.98]">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${zone.icon}</span>
+                        <span class="text-xs font-extrabold text-white leading-snug">${zone.name}</span>
                     </div>
                     <p class="text-[11px] text-slate-400 mt-1 truncate">${zone.sub}</p>
                 </button>
@@ -651,8 +647,8 @@
             document.querySelectorAll('.zone-card').forEach(card => {
                 const isSelected = card.dataset.zone === selectedZoneId;
                 card.className = isSelected
-                    ? 'zone-card text-left p-2.5 sm:p-3 rounded-2xl border-2 border-red-500 bg-red-500/15 shadow-lg shadow-red-950/40 transition min-w-0'
-                    : 'zone-card text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition min-w-0';
+                    ? 'zone-card text-left p-3 rounded-2xl border-2 border-red-500 bg-red-500/15 shadow-lg shadow-red-950/40 transition'
+                    : 'zone-card text-left p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition';
             });
 
             const submitBtn = document.getElementById('btn-submit-report');
@@ -669,16 +665,17 @@
         function selectTag(btn, tagText) {
             selectedTag = tagText;
             document.querySelectorAll('.tag-btn').forEach(b => {
-                b.className = 'tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate';
+                b.className = 'tag-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition';
             });
-            btn.className = 'tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate';
+            btn.className = 'tag-btn active px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition';
         }
 
         async function submitReport() {
             if (!selectedZoneId) return;
             const now = Date.now();
             const zone = CAMPUS_ZONES.find(z => z.id === selectedZoneId);
-            const note = document.getElementById('custom-note').value.trim();
+            const customNote = document.getElementById('custom-note').value.trim();
+            const finalNote = customNote || `${selectedTag} — ${zone.name}發現車管會拖吊車，請附近同學注意！`;
 
             const existingActive = alerts.find(a =>
                 a.zoneId === selectedZoneId &&
@@ -689,16 +686,26 @@
             closeReportModal();
 
             if (existingActive) {
-                existingActive.confirmations += 1;
-                if (note) existingActive.note = note;
-                confirmedIds.add(existingActive.id);
-                saveToStorage();
+                if (!confirmedIds.has(existingActive.id)) {
+                    existingActive.confirmations += 1;
+                    confirmedIds.add(existingActive.id);
+                    saveConfirmedIds();
+                }
+                if (customNote) existingActive.note = customNote;
                 renderAll();
-                showToast('🛡️ 該區 5 分鐘內已有警報！已自動為您「+1 確認目擊」避免洗版');
+                showToast('🛡️ 該區 5 分鐘內已有警報！已自動為您「+1 確認目擊」');
+
+                await postToGasBackend({
+                    action: 'report',
+                    zoneId: selectedZoneId,
+                    area: zone.name,
+                    tag: selectedTag,
+                    note: finalNote
+                });
+                setTimeout(() => fetchRemoteAlerts(false), 1200);
                 return;
             }
 
-            const finalNote = note || `${zone.name}發現車管會拖吊車，請附近同學注意！`;
             const newAlert = {
                 id: 'alert-' + now,
                 zoneId: selectedZoneId,
@@ -710,33 +717,43 @@
             };
 
             alerts.unshift(newAlert);
+            knownActiveIds.add(newAlert.id);
             confirmedIds.add(newAlert.id);
-            saveToStorage();
+            saveConfirmedIds();
             renderAll();
             triggerVisualAndAudioAlert(zone, finalNote);
 
-            const lineDetail = `【${selectedTag}】${finalNote}`;
-            const sent = await sendLineBroadcast(zone.name, lineDetail, 'report');
-            if (sent) {
-                showToast('📲 已同步發送 LINE 推播通知給全體好友！');
-            }
+            await postToGasBackend({
+                action: 'report',
+                zoneId: selectedZoneId,
+                area: zone.name,
+                tag: selectedTag,
+                note: finalNote
+            });
+            showToast('📲 已發送 LINE 警報並同步至全校看板！');
+            setTimeout(() => fetchRemoteAlerts(false), 1200);
         }
 
-        // ==========================================
-        // 5. Alert Interactions (+1 Confirm, Mark Cleared, Simulate)
-        // ==========================================
-        function confirmSighting(alertId) {
+        async function confirmSighting(alertId) {
             const alert = alerts.find(a => a.id === alertId);
             if (!alert || alert.status !== 'active') return;
+
             if (confirmedIds.has(alertId)) {
                 showToast('👍 您已經確認過這則通報囉！');
                 return;
             }
+
             alert.confirmations += 1;
             confirmedIds.add(alertId);
-            saveToStorage();
+            saveConfirmedIds();
             renderAlertFeed();
-            showToast('✅ 已 +1 確認現場目擊，感謝回報！');
+            showToast('✅ 已 +1 確認現場目擊，正在同步雲端人數...');
+
+            await postToGasBackend({
+                action: 'confirm',
+                alertId: alertId
+            });
+            setTimeout(() => fetchRemoteAlerts(false), 1000);
         }
 
         async function markCleared(alertId) {
@@ -745,17 +762,25 @@
 
             alert.status = 'cleared';
             alert.clearedAt = Date.now();
-            saveToStorage();
+            knownActiveIds.delete(alertId);
             renderAll();
 
             const zone = CAMPUS_ZONES.find(z => z.id === alert.zoneId);
             const zoneName = zone ? zone.name : '校內區域';
-            showToast('🟢 已回報「拖車已離開」，警報解除！');
-            await sendLineBroadcast(zoneName, '同學回報拖吊車已離開現場，解除警戒', 'cleared');
+
+            await postToGasBackend({
+                action: 'cleared',
+                alertId: alertId,
+                area: zoneName,
+                note: '同學回報拖吊車已離開現場，解除警戒'
+            });
+            showToast('🟢 已發送 LINE 解除通知，警報解除！');
+            setTimeout(() => fetchRemoteAlerts(false), 1200);
         }
 
         function triggerVisualAndAudioAlert(zone, note) {
             playEmergencyTone();
+
             const shell = document.getElementById('app-shell');
             shell.classList.remove('animate-flash-red');
             void shell.offsetWidth;
@@ -772,10 +797,6 @@
                 banner.classList.remove('opacity-100', 'translate-y-0');
                 banner.classList.add('opacity-0', '-translate-y-6');
             }, 4200);
-
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(`🚨 中山拖吊警報：${zone.name}`, { body: note });
-            }
         }
 
         function checkAutoExpiration() {
@@ -785,18 +806,18 @@
                 if (a.status === 'active' && (now - a.createdAt) >= ALERT_TTL_MS) {
                     a.status = 'cleared';
                     a.clearedAt = now;
+                    knownActiveIds.delete(a.id);
                     changed = true;
                 }
             });
             if (changed) {
-                saveToStorage();
                 renderCampusMap();
                 updateHeaderBadges();
             }
         }
 
         // ==========================================
-        // 6. Rendering UI (Radar Map, Feed, Badges)
+        // 7. Rendering UI
         // ==========================================
         function renderAll() {
             updateHeaderBadges();
@@ -812,12 +833,12 @@
             if (activeCount > 0) {
                 globalPill.className = 'px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-[11px] animate-pulse shrink-0';
                 globalPill.textContent = `⚠️ 校內警戒中 (${activeCount} 處通報)`;
-                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0';
+                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30';
                 feedBadge.textContent = `${activeCount} 則進行中`;
             } else {
                 globalPill.className = 'px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[11px] shrink-0';
                 globalPill.textContent = '✅ 目前全校安全無拖吊';
-                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0';
+                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
                 feedBadge.textContent = '0 則進行中';
             }
         }
@@ -865,6 +886,15 @@
             const feedEl = document.getElementById('alert-feed');
             const now = Date.now();
 
+            if (isInitialLoading) {
+                feedEl.innerHTML = `
+                    <div class="rounded-2xl border border-slate-800 bg-slate-800/30 p-7 text-center">
+                        <p class="text-xs font-bold text-slate-400 animate-pulse">正在同步全校即時通報紀錄...</p>
+                    </div>
+                `;
+                return;
+            }
+
             const filtered = activeZoneFilter === 'all'
                 ? alerts
                 : alerts.filter(a => a.zoneId === activeZoneFilter);
@@ -873,8 +903,8 @@
                 feedEl.innerHTML = `
                     <div class="rounded-2xl border border-slate-800 bg-slate-800/30 p-8 text-center">
                         <div class="text-3xl mb-2">🛵</div>
-                        <p class="text-sm font-bold text-slate-300">此區域目前沒有拖吊通報</p>
-                        <p class="text-xs text-slate-500 mt-1">請大家依然遵守校內停車規定，停放於合法車格內</p>
+                        <p class="text-sm font-bold text-slate-300">目前尚無真實拖吊通報紀錄</p>
+                        <p class="text-xs text-slate-500 mt-1">若在校內發現拖吊車，點擊上方紅色按鈕即可即時通知全校與 LINE</p>
                     </div>
                 `;
                 return;
@@ -891,20 +921,20 @@
 
                 if (isActive) {
                     return `
-                        <article class="rounded-2xl bg-gradient-to-b from-red-950/50 to-slate-800/90 border border-red-500/40 p-3.5 sm:p-4 shadow-lg transition-all min-w-0">
-                            <div class="flex items-start justify-between gap-2 min-w-0">
-                                <div class="flex items-center gap-2.5 min-w-0">
+                        <article class="rounded-2xl bg-gradient-to-b from-red-950/50 to-slate-800/90 border border-red-500/40 p-4 shadow-lg transition-all">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-center gap-2.5">
                                     <span class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-xl shrink-0">
                                         ${zone.icon}
                                     </span>
-                                    <div class="min-w-0">
+                                    <div>
                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                            <h4 class="text-sm font-black text-white truncate">${zone.name}</h4>
-                                            <span class="px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 text-[10px] font-bold border border-red-500/30 shrink-0">
-                                                ${alert.tag}
+                                            <h4 class="text-sm font-black text-white">${zone.name}</h4>
+                                            <span class="px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 text-[10px] font-bold border border-red-500/30">
+                                                ${escapeHtml(alert.tag)}
                                             </span>
                                         </div>
-                                        <p class="text-[11px] text-slate-400 mt-0.5 truncate">${elapsedMin} 分鐘前通報 • 剩餘 ${remMin}:${remSec} 自動解除</p>
+                                        <p class="text-[11px] text-slate-400 mt-0.5">${elapsedMin} 分鐘前通報 • 剩餘 ${remMin}:${remSec} 自動解除</p>
                                     </div>
                                 </div>
                                 <span class="flex h-2.5 w-2.5 shrink-0 mt-1">
@@ -913,42 +943,42 @@
                                 </span>
                             </div>
 
-                            <p class="mt-3 text-sm text-slate-100 bg-slate-950/50 rounded-xl px-3 py-2.5 border border-slate-800/80 leading-relaxed break-words">
+                            <p class="mt-3 text-sm text-slate-100 bg-slate-950/50 rounded-xl px-3 py-2.5 border border-slate-800/80 leading-relaxed">
                                 「${escapeHtml(alert.note)}」
                             </p>
 
                             <div class="mt-3 flex items-center gap-2">
-                                <button type="button" onclick="confirmSighting('${alert.id}')"
-                                    class="flex-1 py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1 transition active:scale-95 min-w-0
+                                <button onclick="confirmSighting('${alert.id}')"
+                                    class="flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition active:scale-95
                                     ${isConfirmedByMe
                                         ? 'bg-amber-500/25 border border-amber-400/50 text-amber-200'
                                         : 'bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white'}">
-                                    <span class="shrink-0">👀</span>
-                                    <span class="truncate">${isConfirmedByMe ? '已確認' : '+1 看到了'} (${alert.confirmations})</span>
+                                    <span>👀</span>
+                                    <span>${isConfirmedByMe ? '已確認目擊' : '+1 我也看到了'} (${alert.confirmations})</span>
                                 </button>
-                                <button type="button" onclick="markCleared('${alert.id}')"
-                                    class="py-2 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1 transition active:scale-95 shrink-0 whitespace-nowrap">
-                                    <span>✅ 已離開</span>
+                                <button onclick="markCleared('${alert.id}')"
+                                    class="py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1 transition active:scale-95">
+                                    <span>✅ 拖車已離開</span>
                                 </button>
                             </div>
                         </article>
                     `;
                 } else {
                     return `
-                        <article class="rounded-2xl bg-slate-800/40 border border-slate-800 p-3.5 opacity-75 min-w-0">
-                            <div class="flex items-center justify-between gap-2 min-w-0">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg grayscale shrink-0">
+                        <article class="rounded-2xl bg-slate-800/40 border border-slate-800 p-3.5 opacity-75">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg grayscale">
                                         ${zone.icon}
                                     </span>
-                                    <div class="min-w-0">
+                                    <div>
                                         <div class="flex items-center gap-2 flex-wrap">
-                                            <h4 class="text-xs font-bold text-slate-300 truncate">${zone.name}</h4>
-                                            <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold shrink-0">
+                                            <h4 class="text-xs font-bold text-slate-300">${zone.name}</h4>
+                                            <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
                                                 已撤離 / 解除
                                             </span>
                                         </div>
-                                        <p class="text-[11px] text-slate-500 mt-0.5 truncate">${elapsedMin} 分鐘前通報 • 累計 ${alert.confirmations} 人確認</p>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">${elapsedMin} 分鐘前通報 • 累計 ${alert.confirmations} 人確認</p>
                                     </div>
                                 </div>
                             </div>
@@ -959,19 +989,19 @@
         }
 
         // ==========================================
-        // 7. Utility Helpers
+        // 8. Utility Helpers
         // ==========================================
         let toastTimer = null;
         function showToast(message) {
-            const toastInner = document.getElementById('toast-inner');
-            toastInner.textContent = message;
-            toastInner.classList.remove('opacity-0', 'translate-y-2');
-            toastInner.classList.add('opacity-100', 'translate-y-0');
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0', 'translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
 
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => {
-                toastInner.classList.remove('opacity-100', 'translate-y-0');
-                toastInner.classList.add('opacity-0', 'translate-y-2');
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-2');
             }, 3000);
         }
 

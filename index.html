@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="zh-Hant" class="dark">
 <head>
     <meta charset="UTF-8">
@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0F172A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="中山拖吊警報">
     <title>中山車管會拖吊警報器 | 西子灣即時互助系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,15 +22,10 @@
                     },
                     animation: {
                         'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'radar-ping': 'radarPing 2s cubic-bezier(0, 0, 0.2, 1) infinite',
-                        'slide-up': 'slideUp 0.25s ease-out forwards',
+                        'slide-up': 'slideUp 0.24s ease-out forwards',
                         'flash-red': 'flashRed 0.6s ease-out',
                     },
                     keyframes: {
-                        radarPing: {
-                            '0%': { transform: 'scale(0.8)', opacity: '0.9' },
-                            '75%, 100%': { transform: 'scale(2.4)', opacity: '0' },
-                        },
                         slideUp: {
                             '0%': { transform: 'translateY(100%)', opacity: '0' },
                             '100%': { transform: 'translateY(0)', opacity: '1' },
@@ -44,15 +40,25 @@
         }
     </script>
     <style>
-        body {
+        /* Ensure strict box-sizing and prevent horizontal overflow across all mobile viewports */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
             background-color: #020617;
             color: #F8FAFC;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
+            margin: 0;
+            padding: 0;
         }
-        /* Custom scrollbar for sleek mobile container */
+        /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 4px;
+            height: 4px;
         }
         ::-webkit-scrollbar-track {
             background: #0F172A;
@@ -65,72 +71,69 @@
             box-shadow: 0 0 30px rgba(239, 68, 68, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.3);
         }
         .sos-glow:active {
-            transform: scale(0.97);
+            transform: scale(0.98);
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
         }
-        /* 修正手機版彈出選單與外層水平溢出 */
-html, body {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* 針對底部彈出式選單 / Modal / Sheet 強制貼齊螢幕寬度 */
-[class*="sheet"],
-[class*="modal"],
-[class*="drawer"],
-[class*="popup"],
-[class*="panel"] {
-  left: 0 !important;
-  right: 0 !important;
-  max-width: 100vw !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  transform: translateX(0) !important;
-}
+        /* Bottom sheet container strictly aligned within 100vw on mobile */
+        .bottom-sheet-panel {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            max-width: 100vw;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 480px) {
+            .bottom-sheet-panel {
+                max-width: 480px;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen flex justify-center bg-slate-950 font-sans antialiased">
 
-    <!-- Mobile-First App Shell (Max-width 480px on desktop, full width on mobile) -->
-    <div id="app-shell" class="w-full max-w-[480px] min-h-screen bg-slate-900 border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
+    <!-- Mobile-First App Shell (Full width on mobile, capped cleanly at 480px on desktop) -->
+    <div id="app-shell" class="w-full max-w-full sm:max-w-[480px] min-h-screen bg-slate-900 sm:border-x border-slate-800/80 flex flex-col relative shadow-2xl overflow-x-hidden">
 
-        <!-- Incoming Push Banner Notification (Simulated OS Push Toast) -->
-        <div id="push-banner" class="fixed top-3 left-1/2 -translate-x-1/2 w-[92%] max-w-[445px] z-50 pointer-events-none opacity-0 -translate-y-6 transition-all duration-300">
-            <div class="bg-slate-800/95 backdrop-blur-md border border-red-500/60 rounded-2xl p-3.5 shadow-2xl flex items-start gap-3">
+        <!-- Incoming Push Banner Notification -->
+        <div id="push-banner" class="fixed top-3 left-0 right-0 z-50 px-3 pointer-events-none opacity-0 -translate-y-6 transition-all duration-300 flex justify-center">
+            <div class="w-full max-w-[456px] bg-slate-800/95 backdrop-blur-md border border-red-500/60 rounded-2xl p-3.5 shadow-2xl flex items-start gap-3 min-w-0">
                 <div class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 text-xl animate-bounce">
                     🚨
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-xs font-bold text-red-400 tracking-wide uppercase">中山車管會緊急推播</span>
-                        <span class="text-[11px] text-slate-400">剛剛</span>
+                        <span class="text-xs font-bold text-red-400 tracking-wide uppercase truncate">中山車管會緊急推播</span>
+                        <span class="text-[11px] text-slate-400 shrink-0">剛剛</span>
                     </div>
-                    <p id="push-banner-title" class="text-sm font-bold text-white truncate mt-0.5">工學院 / 電資大樓 發現拖吊車！</p>
+                    <p id="push-banner-title" class="text-sm font-bold text-white truncate mt-0.5">工學院 發現拖吊車！</p>
                     <p id="push-banner-desc" class="text-xs text-slate-300 truncate mt-0.5">請停在紅線或機慢車道旁的同學儘速移車！</p>
                 </div>
             </div>
         </div>
 
         <!-- Top Header & Live Status Bar -->
-        <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 pt-3.5 pb-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-700 flex items-center justify-center shadow-lg shadow-red-950/50">
+        <header class="sticky top-0 z-30 w-full bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 pt-3.5 pb-3">
+            <div class="flex items-center justify-between gap-2 min-w-0">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-700 flex items-center justify-center shadow-lg shadow-red-950/50 shrink-0">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
                     </div>
-                    <div>
-                        <h1 class="text-base font-black tracking-tight text-white leading-tight flex items-center gap-1.5">
+                    <div class="min-w-0">
+                        <h1 class="text-base font-black tracking-tight text-white leading-tight truncate">
                             中山車管會拖吊警報器
                         </h1>
-                        <p class="text-[11px] text-slate-400 font-medium">西子灣即時互助通報系統 v1.0</p>
+                        <p class="text-[11px] text-slate-400 font-medium truncate">西子灣即時互助通報系統 v1.1</p>
                     </div>
                 </div>
 
                 <!-- Sound & Push Notification Toggle -->
-                <div class="flex items-center gap-1.5">
-                    <button id="btn-sound-toggle" onclick="toggleSound()" title="切換警報音效" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition active:scale-95">
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button id="btn-sound-toggle" type="button" onclick="toggleSound()" title="切換警報音效" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition active:scale-95">
                         <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
                         </svg>
@@ -138,50 +141,50 @@ html, body {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
                         </svg>
                     </button>
-                    <button id="btn-notify-toggle" onclick="requestNotificationPermission()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1 transition active:scale-95">
-                        <span id="notify-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <button id="btn-notify-toggle" type="button" onclick="requestNotificationPermission()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap">
+                        <span id="notify-dot" class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
                         <span id="notify-label">開啟推播</span>
                     </button>
                 </div>
             </div>
 
             <!-- Live Campus Telemetry Bar -->
-            <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <div class="flex items-center gap-1.5 text-emerald-400 font-medium">
-                    <span class="relative flex h-2 w-2">
+            <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs min-w-0">
+                <div class="flex items-center gap-1.5 text-emerald-400 font-medium truncate">
+                    <span class="relative flex h-2 w-2 shrink-0">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span>目前線上：<strong id="online-count" class="font-bold">148</strong> 位中山人</span>
+                    <span class="truncate">目前線上：<strong id="online-count" class="font-bold">148</strong> 位中山人</span>
                 </div>
-                <div id="global-status-pill" class="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 font-bold text-[11px]">
+                <div id="global-status-pill" class="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 font-bold text-[11px] shrink-0">
                     ⚠️ 校內警戒中 (1 處通報)
                 </div>
             </div>
         </header>
 
         <!-- Main Scrollable Content -->
-        <main class="flex-1 px-4 py-4 space-y-5 pb-24">
+        <main class="flex-1 w-full px-4 py-4 space-y-5 pb-24 min-w-0">
 
             <!-- Primary One-Tap Emergency Button -->
-            <section aria-label="一鍵通報按鈕">
-                <button onclick="openReportModal()" class="w-full relative group overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 p-4 text-white sos-glow transition-all duration-150 border border-red-400/40">
+            <section aria-label="一鍵通報按鈕" class="w-full">
+                <button type="button" onclick="openReportModal()" class="w-full relative group overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 p-4 text-white sos-glow transition-all duration-150 border border-red-400/40">
                     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.22),transparent_60%)]"></div>
-                    <div class="relative flex items-center justify-between">
-                        <div class="flex items-center gap-3.5 text-left">
-                            <div class="w-13 h-13 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-3xl shrink-0">
+                    <div class="relative flex items-center justify-between gap-2 min-w-0">
+                        <div class="flex items-center gap-3 text-left min-w-0">
+                            <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-2xl shrink-0">
                                 🚨
                             </div>
-                            <div>
-                                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/25 text-[11px] font-bold tracking-wider uppercase mb-1">
+                            <div class="min-w-0">
+                                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/25 text-[10px] font-bold tracking-wider uppercase mb-1">
                                     <span>SOS 緊急廣播</span>
                                 </div>
-                                <h2 class="text-xl font-black tracking-tight leading-none">發現拖吊車！立即通報</h2>
-                                <p class="text-xs text-red-100 mt-1 font-medium">點擊選擇校內區域，一秒通知所有線上同學</p>
+                                <h2 class="text-lg sm:text-xl font-black tracking-tight leading-tight truncate">發現拖吊車！立即通報</h2>
+                                <p class="text-xs text-red-100 mt-1 font-medium truncate">點擊選擇校內區域，一秒通知全校同學</p>
                             </div>
                         </div>
-                        <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:translate-x-0.5 transition-transform">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:translate-x-0.5 transition-transform">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                             </svg>
                         </div>
@@ -190,40 +193,39 @@ html, body {
             </section>
 
             <!-- Interactive NSYSU Campus Radar Map -->
-            <section class="bg-slate-800/50 border border-slate-700/70 rounded-2xl p-3.5">
-                <div class="flex items-center justify-between mb-2.5">
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-sm">🗺️</span>
-                        <h3 class="text-xs font-bold text-slate-200 tracking-wide uppercase">西子灣校區即時熱點雷達</h3>
+            <section class="w-full bg-slate-800/50 border border-slate-700/70 rounded-2xl p-3.5 min-w-0">
+                <div class="flex items-center justify-between gap-2 mb-2.5">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="text-sm shrink-0">🗺️</span>
+                        <h3 class="text-xs font-bold text-slate-200 tracking-wide uppercase truncate">西子灣校區即時熱點雷達</h3>
                     </div>
-                    <button id="btn-reset-filter" onclick="setZoneFilter('all')" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hidden">
+                    <button id="btn-reset-filter" type="button" onclick="setZoneFilter('all')" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hidden shrink-0">
                         顯示全部區域
                     </button>
                 </div>
 
                 <!-- Stylized Interactive SVG Map of NSYSU -->
                 <div class="relative w-full h-44 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden select-none">
-                    <svg viewBox="0 0 400 180" class="w-full h-full">
-                        <!-- Ocean / Xiziwan Bay (Left & Bottom) -->
+                    <svg viewBox="0 0 400 180" preserveAspectRatio="xMidYMid slice" class="w-full h-full block">
+                        <!-- Ocean / Xiziwan Bay -->
                         <path d="M0,0 L125,0 C110,45 95,90 120,135 C135,160 175,168 230,180 L0,180 Z" fill="#0C2D48" opacity="0.75"/>
-                        <text x="24" y="155" fill="#38BDF8" opacity="0.45" font-size="10" font-weight="700" letter-spacing="1">台灣海峽 / 西子灣海域</text>
+                        <text x="20" y="156" fill="#38BDF8" opacity="0.5" font-size="9.5" font-weight="700" letter-spacing="1">台灣海峽 / 西子灣海域</text>
 
                         <!-- Chaishan Mountain / Green Campus Area -->
                         <path d="M125,0 L400,0 L400,180 L230,180 C175,168 135,160 120,135 C95,90 110,45 125,0 Z" fill="#0F172A"/>
-                        <!-- Contour lines -->
                         <path d="M240,10 Q320,40 380,15" stroke="#1E293B" stroke-width="1.5" fill="none"/>
                         <path d="M260,35 Q335,70 395,45" stroke="#1E293B" stroke-width="1.5" fill="none"/>
                         <text x="315" y="25" fill="#475569" font-size="9" font-weight="600">柴山山脈</text>
 
-                        <!-- Main Campus Roads (Lianhai Rd & Tunnel) -->
+                        <!-- Main Campus Roads -->
                         <path d="M115,125 Q165,148 245,142 T365,120" stroke="#334155" stroke-width="4" fill="none" stroke-linecap="round"/>
                         <path d="M245,142 L265,75 L335,55" stroke="#334155" stroke-width="3" fill="none" stroke-linecap="round"/>
                         <path d="M115,125 L135,45" stroke="#334155" stroke-width="3" fill="none" stroke-linecap="round"/>
 
-                        <!-- Zone Hotspots (Rendered dynamically via JS) -->
+                        <!-- Zone Hotspots -->
                         <g id="map-hotspots"></g>
                     </svg>
-                    <div class="absolute bottom-2 right-2.5 flex items-center gap-2.5 bg-slate-900/85 backdrop-blur-sm px-2 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300">
+                    <div class="absolute bottom-2 right-2.5 flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-sm px-2 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>拖吊警戒</span>
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>安全無虞</span>
                     </div>
@@ -231,90 +233,94 @@ html, body {
             </section>
 
             <!-- Live Alert Feed Section -->
-            <section class="space-y-3">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <h3 class="text-sm font-extrabold text-white tracking-tight">即時通報動態</h3>
-                        <span id="active-count-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">1 則進行中</span>
+            <section class="w-full space-y-3 min-w-0">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <h3 class="text-sm font-extrabold text-white tracking-tight truncate">即時通報動態</h3>
+                        <span id="active-count-badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0">1 則進行中</span>
                     </div>
-                    <span class="text-[11px] text-slate-400">通報 15 分鐘後自動解除</span>
+                    <span class="text-[11px] text-slate-400 shrink-0">15 分鐘自動解除</span>
                 </div>
 
                 <!-- Alert Cards Container -->
-                <div id="alert-feed" class="space-y-3">
+                <div id="alert-feed" class="w-full space-y-3 min-w-0">
                     <!-- Populated via JavaScript -->
                 </div>
             </section>
 
         </main>
 
-        <!-- Bottom Demo & Simulation Bar (For Prototype Testing) -->
-        <footer class="fixed bottom-0 w-full max-w-[480px] bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-2.5 z-30 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">原型測試</span>
-                <span>模擬其他同學發送警報：</span>
+        <!-- Bottom Demo & Simulation Bar -->
+        <footer class="fixed bottom-0 left-0 right-0 z-30 flex justify-center pointer-events-none">
+            <div class="w-full max-w-full sm:max-w-[480px] bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-2.5 flex items-center justify-between gap-2 pointer-events-auto">
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-400 min-w-0">
+                    <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px] shrink-0">測試</span>
+                    <span class="truncate">模擬他人發送警報：</span>
+                </div>
+                <button type="button" onclick="simulateIncomingAlert()" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shrink-0 whitespace-nowrap">
+                    <span>📡 模擬收到推播</span>
+                </button>
             </div>
-            <button onclick="simulateIncomingAlert()" class="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition active:scale-95">
-                <span>📡 模擬收到推播</span>
-            </button>
         </footer>
 
-        <!-- Quick-Select Report Modal / Bottom Sheet -->
-        <div id="report-modal" class="fixed inset-0 z-50 hidden">
+        <!-- Quick-Select Report Modal / Bottom Sheet (Strictly 100vw & zero horizontal overflow) -->
+        <div id="report-modal" class="fixed inset-0 z-50 hidden w-screen max-w-[100vw] overflow-x-hidden">
             <!-- Backdrop -->
-            <div onclick="closeReportModal()" class="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"></div>
+            <div onclick="closeReportModal()" class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"></div>
 
-            <!-- Modal Content -->
-            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-slate-900 border-t border-slate-700 rounded-t-3xl p-5 shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto">
-                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4"></div>
+            <!-- Bottom Sheet Panel -->
+            <div class="bottom-sheet-panel bg-slate-900 border-t border-slate-700 rounded-t-3xl p-4 sm:p-5 shadow-2xl animate-slide-up max-h-[88vh] overflow-y-auto overflow-x-hidden">
+                <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3.5"></div>
 
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <h2 class="text-lg font-black text-white flex items-center gap-2">
+                <div class="flex items-start justify-between gap-2 mb-3 min-w-0">
+                    <div class="min-w-0">
+                        <h2 class="text-base sm:text-lg font-black text-white flex items-center gap-1.5 truncate">
                             <span>🚨 選擇發現拖吊車位置</span>
                         </h2>
                         <p class="text-xs text-slate-400 mt-0.5">點擊區域即可立即推播給全校線上同學</p>
                     </div>
-                    <button onclick="closeReportModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+                    <button type="button" onclick="closeReportModal()" aria-label="關閉視窗" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center shrink-0">
                         ✕
                     </button>
                 </div>
 
-                <!-- Hotspot Grid -->
-                <div id="zone-grid" class="grid grid-cols-2 gap-2.5 my-3">
+                <!-- Hotspot Grid (2 columns on mobile with proper min-w-0 to prevent overflow) -->
+                <div id="zone-grid" class="grid grid-cols-2 gap-2 my-3 w-full">
                     <!-- Populated by JS -->
                 </div>
 
                 <!-- Quick Urgency Tags -->
-                <div class="mt-4">
+                <div class="mt-3.5 w-full min-w-0">
                     <label class="block text-xs font-bold text-slate-300 mb-2">現場狀況快選（選填）</label>
-                    <div id="tag-selector" class="flex flex-wrap gap-2">
-                        <button type="button" onclick="selectTag(this, '拖車巡邏移動中')" class="tag-btn active px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition">
+                    <div id="tag-selector" class="flex flex-wrap gap-1.5 w-full">
+                        <button type="button" onclick="selectTag(this, '拖車巡邏移動中')" class="tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate">
                             🚛 拖車巡邏移動中
                         </button>
-                        <button type="button" onclick="selectTag(this, '正在開單 / 準備上夾')" class="tag-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition">
-                            📸 正在開單 / 準備上夾
+                        <button type="button" onclick="selectTag(this, '正在開單 / 拖吊')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
+                            📸 正在開單 / 拖吊
                         </button>
-                        <button type="button" onclick="selectTag(this, '貨車式吊車出沒')" class="tag-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition">
+                        <button type="button" onclick="selectTag(this, '貨車式吊車出沒')" class="tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate">
                             🏗️ 貨車式吊車出沒
                         </button>
                     </div>
                 </div>
 
                 <!-- Optional Short Note -->
-                <div class="mt-3.5">
-                    <input id="custom-note" type="text" maxlength="40" placeholder="補充說明（例如：往海堤方向開過去了...）" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
+                <div class="mt-3 w-full min-w-0">
+                    <input id="custom-note" type="text" maxlength="40" placeholder="補充說明（例如：往海堤方向開過去了...）" class="w-full max-w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
                 </div>
 
                 <!-- Submit Action -->
-                <button id="btn-submit-report" onclick="submitReport()" class="w-full mt-4 py-3.5 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base shadow-lg shadow-red-950/60 transition active:scale-[0.98]">
+                <button id="btn-submit-report" type="button" onclick="submitReport()" class="w-full max-w-full mt-3.5 py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm sm:text-base shadow-lg shadow-red-950/60 transition active:scale-[0.98] truncate">
                     請先選擇上方區域
                 </button>
             </div>
         </div>
 
         <!-- Toast Feedback Message -->
-        <div id="toast" class="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-white text-xs font-bold shadow-2xl opacity-0 pointer-events-none transition-all duration-200 whitespace-nowrap">
+        <div id="toast" class="fixed bottom-16 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
+            <div id="toast-inner" class="max-w-[92vw] px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-white text-xs font-bold shadow-2xl opacity-0 translate-y-2 transition-all duration-200 truncate">
+            </div>
         </div>
 
     </div>
@@ -333,14 +339,6 @@ html, body {
                 y: 118
             },
             {
-                id: 'engineering',
-                icon: '⚙️',
-                name: '工學院 / 電資大樓',
-                sub: '機電館・理學院周邊',
-                x: 245,
-                y: 82
-            },
-            {
                 id: 'management',
                 icon: '🏢',
                 name: '管理學院 / 圖資大樓',
@@ -349,20 +347,28 @@ html, body {
                 y: 122
             },
             {
-                id: 'dorms',
-                icon: '🏠',
-                name: '武嶺 / 翠亨宿舍區',
-                sub: '雨樹・山海樓・武嶺坡道',
-                x: 325,
-                y: 62
-            },
-            {
                 id: 'tunnel',
                 icon: '⛩️',
                 name: '西子灣隧道口 / 活中',
                 sub: '蔣公行館・萊爾富前',
                 x: 342,
                 y: 124
+            },
+            {
+                id: 'engineering',
+                icon: '⚙️',
+                name: '工學院 / 電資大樓',
+                sub: '機電館・理學院周邊',
+                x: 245,
+                y: 82
+            },
+            {
+                id: 'dorms',
+                icon: '🏠',
+                name: '武嶺 / 翠亨宿舍區',
+                sub: '雨樹・山海樓・武嶺坡道',
+                x: 325,
+                y: 62
             },
             {
                 id: 'liberal',
@@ -374,10 +380,9 @@ html, body {
             }
         ];
 
-        const ALERT_TTL_MS = 15 * 60 * 1000;      // 15 minutes auto-expiration
-        const COOLDOWN_MS = 5 * 60 * 1000;        // 5 minutes anti-spam cooldown per zone
+        const ALERT_TTL_MS = 15 * 60 * 1000;   // 15 minutes auto-expiration
+        const COOLDOWN_MS = 5 * 60 * 1000;     // 5 minutes anti-spam cooldown per zone
 
-        // Application State
         let alerts = [];
         let selectedZoneId = null;
         let selectedTag = '拖車巡邏移動中';
@@ -386,50 +391,51 @@ html, body {
         let confirmedIds = new Set();
 
         // ==========================================
-        // 2. Initialization & Seed Data
+        // 2. Initialization & Storage
         // ==========================================
         function init() {
             loadFromStorage();
             renderZoneSelector();
             renderAll();
 
-            // Live countdown & expiration ticker every second
             setInterval(() => {
                 checkAutoExpiration();
                 renderAlertFeed();
             }, 1000);
 
-            // Subtle realistic fluctuation in online student count
             setInterval(() => {
                 const countEl = document.getElementById('online-count');
-                const current = parseInt(countEl.textContent, 10);
+                if (!countEl) return;
+                const current = parseInt(countEl.textContent, 10) || 148;
                 const delta = Math.floor(Math.random() * 5) - 2;
-                countEl.textContent = Math.max(98, current + delta);
+                countEl.textContent = String(Math.max(98, current + delta));
             }, 6000);
         }
 
         function loadFromStorage() {
-            const saved = localStorage.getItem('nsysu_towing_alerts_v1');
-            if (saved) {
-                try {
-                    alerts = JSON.parse(saved);
-                    return;
-                } catch (e) {
-                    console.error('Failed to parse saved alerts', e);
+            try {
+                const saved = localStorage.getItem('nsysu_towing_alerts_v1');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) {
+                        alerts = parsed;
+                        return;
+                    }
                 }
+            } catch (e) {
+                console.warn('Failed to load alerts from storage:', e);
             }
 
-            // Default sample alerts so user immediately understands the system
             const now = Date.now();
             alerts = [
                 {
                     id: 'alert-init-1',
                     zoneId: 'engineering',
-                    tag: '正在開單 / 準備上夾',
-                    note: '白色小貨車式拖吊車停在電資大樓紅線旁，已經在拍照了！',
-                    createdAt: now - (3 * 60 * 1000 + 20 * 1000), // 3m 20s ago
+                    tag: '正在開單 / 拖吊',
+                    note: '白色貨車式拖吊車停在電資大樓紅線旁，已經在拍照了！',
+                    createdAt: now - (3 * 60 * 1000 + 20 * 1000),
                     confirmations: 8,
-                    status: 'active' // 'active' | 'cleared'
+                    status: 'active'
                 },
                 {
                     id: 'alert-init-2',
@@ -446,11 +452,15 @@ html, body {
         }
 
         function saveToStorage() {
-            localStorage.setItem('nsysu_towing_alerts_v1', JSON.stringify(alerts));
+            try {
+                localStorage.setItem('nsysu_towing_alerts_v1', JSON.stringify(alerts));
+            } catch (e) {
+                console.warn('Failed to save alerts:', e);
+            }
         }
 
         // ==========================================
-        // 3. Web Audio API Synthesized Emergency Siren
+        // 3. Web Audio API Alert Tone
         // ==========================================
         function playEmergencyTone() {
             if (!soundEnabled) return;
@@ -459,7 +469,6 @@ html, body {
                 const ctx = new AudioCtx();
                 const now = ctx.currentTime;
 
-                // Two-tone tactical alert chime (High-Low-High)
                 const freqs = [880, 659.25, 987.77];
                 freqs.forEach((freq, idx) => {
                     const osc = ctx.createOscillator();
@@ -477,7 +486,7 @@ html, body {
                     osc.stop(now + idx * 0.14 + 0.14);
                 });
             } catch (e) {
-                // Audio context may require prior user gesture on some mobile browsers
+                // Ignore audio errors when gesture is pending
             }
         }
 
@@ -494,7 +503,7 @@ html, body {
             const label = document.getElementById('notify-label');
 
             if (!('Notification' in window)) {
-                dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
                 label.textContent = '模擬推播中';
                 showToast('🔔 已啟用應用程式內即時推播通知');
                 return;
@@ -502,19 +511,19 @@ html, body {
 
             Notification.requestPermission().then((perm) => {
                 if (perm === 'granted') {
-                    dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                    dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
                     label.textContent = '推播已開啟';
                     showToast('✅ 系統推播通知已成功開啟！');
                 } else {
-                    dot.className = 'w-2 h-2 rounded-full bg-sky-400';
+                    dot.className = 'w-2 h-2 rounded-full bg-sky-400 shrink-0';
                     label.textContent = '站內提醒中';
-                    showToast('ℹ️ 瀏覽器權限未開啟，將改以站內橫幅推播提醒');
+                    showToast('ℹ️ 已改以站內橫幅推播提醒');
                 }
             });
         }
 
         // ==========================================
-        // 4. Reporting & Anti-Spam Cooldown Logic
+        // 4. Reporting & Anti-Spam Cooldown
         // ==========================================
         function openReportModal(preselectZoneId = null) {
             selectedZoneId = preselectZoneId;
@@ -531,10 +540,10 @@ html, body {
             const grid = document.getElementById('zone-grid');
             grid.innerHTML = CAMPUS_ZONES.map(zone => `
                 <button type="button" data-zone="${zone.id}" onclick="selectZone('${zone.id}')"
-                    class="zone-card text-left p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition active:scale-[0.98]">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xl">${zone.icon}</span>
-                        <span class="text-xs font-extrabold text-white leading-snug">${zone.name}</span>
+                    class="zone-card w-full min-w-0 text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition active:scale-[0.98]">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="text-lg sm:text-xl shrink-0">${zone.icon}</span>
+                        <span class="text-xs font-extrabold text-white leading-snug truncate">${zone.name}</span>
                     </div>
                     <p class="text-[11px] text-slate-400 mt-1 truncate">${zone.sub}</p>
                 </button>
@@ -550,8 +559,8 @@ html, body {
             document.querySelectorAll('.zone-card').forEach(card => {
                 const isSelected = card.dataset.zone === selectedZoneId;
                 card.className = isSelected
-                    ? 'zone-card text-left p-3 rounded-2xl border-2 border-red-500 bg-red-500/15 shadow-lg shadow-red-950/40 transition'
-                    : 'zone-card text-left p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition';
+                    ? 'zone-card w-full min-w-0 text-left p-2.5 sm:p-3 rounded-2xl border-2 border-red-500 bg-red-500/15 shadow-lg shadow-red-950/40 transition'
+                    : 'zone-card w-full min-w-0 text-left p-2.5 sm:p-3 rounded-2xl border border-slate-700/90 bg-slate-800/70 hover:bg-slate-800 transition';
             });
 
             const submitBtn = document.getElementById('btn-submit-report');
@@ -568,9 +577,9 @@ html, body {
         function selectTag(btn, tagText) {
             selectedTag = tagText;
             document.querySelectorAll('.tag-btn').forEach(b => {
-                b.className = 'tag-btn px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition';
+                b.className = 'tag-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600 transition max-w-full truncate';
             });
-            btn.className = 'tag-btn active px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition';
+            btn.className = 'tag-btn active px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-red-500/60 bg-red-500/20 text-red-300 transition max-w-full truncate';
         }
 
         function submitReport() {
@@ -579,7 +588,6 @@ html, body {
             const zone = CAMPUS_ZONES.find(z => z.id === selectedZoneId);
             const note = document.getElementById('custom-note').value.trim();
 
-            // Check 5-minute Anti-Spam Cooldown for the same active zone
             const existingActive = alerts.find(a =>
                 a.zoneId === selectedZoneId &&
                 a.status === 'active' &&
@@ -594,11 +602,10 @@ html, body {
                 confirmedIds.add(existingActive.id);
                 saveToStorage();
                 renderAll();
-                showToast(`🛡️ 該區 5 分鐘內已有警報！已自動為您「+1 確認目擊」避免洗版`);
+                showToast(`🛡️ 該區 5 分鐘內已有警報！已自動為您「+1 確認目擊」`);
                 return;
             }
 
-            // Create new broadcast alert
             const newAlert = {
                 id: 'alert-' + now,
                 zoneId: selectedZoneId,
@@ -617,7 +624,7 @@ html, body {
         }
 
         // ==========================================
-        // 5. Alert Interactions (+1 Confirm, Mark Cleared, Simulate)
+        // 5. Alert Actions & Simulations
         // ==========================================
         function confirmSighting(alertId) {
             const alert = alerts.find(a => a.id === alertId);
@@ -680,13 +687,11 @@ html, body {
         function triggerVisualAndAudioAlert(zone, note) {
             playEmergencyTone();
 
-            // Screen border flash
             const shell = document.getElementById('app-shell');
             shell.classList.remove('animate-flash-red');
-            void shell.offsetWidth; // trigger reflow
+            void shell.offsetWidth;
             shell.classList.add('animate-flash-red');
 
-            // Top slide-down push banner
             const banner = document.getElementById('push-banner');
             document.getElementById('push-banner-title').textContent = `${zone.icon} ${zone.name} 發現拖吊車！`;
             document.getElementById('push-banner-desc').textContent = note;
@@ -699,11 +704,12 @@ html, body {
                 banner.classList.add('opacity-0', '-translate-y-6');
             }, 4200);
 
-            // Native OS Notification if granted
             if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(`🚨 中山拖吊警報：${zone.name}`, {
-                    body: note
-                });
+                try {
+                    new Notification(`🚨 中山拖吊警報：${zone.name}`, { body: note });
+                } catch (e) {
+                    // Ignore notification errors in restricted contexts
+                }
             }
         }
 
@@ -725,7 +731,7 @@ html, body {
         }
 
         // ==========================================
-        // 6. Rendering UI (Radar Map, Feed, Badges)
+        // 6. UI Rendering
         // ==========================================
         function renderAll() {
             updateHeaderBadges();
@@ -739,14 +745,14 @@ html, body {
             const feedBadge = document.getElementById('active-count-badge');
 
             if (activeCount > 0) {
-                globalPill.className = 'px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-[11px] animate-pulse';
-                globalPill.textContent = `⚠️ 校內警戒中 (${activeCount} 處通報)`;
-                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30';
+                globalPill.className = 'px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-[11px] animate-pulse shrink-0';
+                globalPill.textContent = `⚠️ 校內警戒中 (${activeCount})`;
+                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 shrink-0';
                 feedBadge.textContent = `${activeCount} 則進行中`;
             } else {
-                globalPill.className = 'px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[11px]';
-                globalPill.textContent = '✅ 目前全校安全無拖吊';
-                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+                globalPill.className = 'px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[11px] shrink-0';
+                globalPill.textContent = '✅ 全校安全';
+                feedBadge.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0';
                 feedBadge.textContent = '0 則進行中';
             }
         }
@@ -779,7 +785,7 @@ html, body {
                             stroke="${isFiltered ? '#FFFFFF' : '#0F172A'}"
                             stroke-width="2"/>
                         <rect x="${zone.x - 28}" y="${zone.y + 9}" width="56" height="14" rx="4"
-                            fill="${isAlert ? '#7F1D1D' : '#1E293B'}" opacity="0.9"/>
+                            fill="${isAlert ? '#7F1D1D' : '#1E293B'}" opacity="0.92"/>
                         <text x="${zone.x}" y="${zone.y + 19}" text-anchor="middle"
                             fill="${isAlert ? '#FCA5A5' : '#CBD5E1'}"
                             font-size="8.5" font-weight="700">
@@ -800,7 +806,7 @@ html, body {
 
             if (filtered.length === 0) {
                 feedEl.innerHTML = `
-                    <div class="rounded-2xl border border-slate-800 bg-slate-800/30 p-8 text-center">
+                    <div class="rounded-2xl border border-slate-800 bg-slate-800/30 p-7 text-center">
                         <div class="text-3xl mb-2">🛵</div>
                         <p class="text-sm font-bold text-slate-300">此區域目前沒有拖吊通報</p>
                         <p class="text-xs text-slate-500 mt-1">請大家依然遵守校內停車規定，停放於合法車格內</p>
@@ -820,65 +826,63 @@ html, body {
 
                 if (isActive) {
                     return `
-                        <article class="rounded-2xl bg-gradient-to-b from-red-950/50 to-slate-800/90 border border-red-500/40 p-4 shadow-lg transition-all">
-                            <div class="flex items-start justify-between gap-2">
-                                <div class="flex items-center gap-2.5">
+                        <article class="w-full min-w-0 rounded-2xl bg-gradient-to-b from-red-950/50 to-slate-800/90 border border-red-500/40 p-4 shadow-lg transition-all">
+                            <div class="flex items-start justify-between gap-2 min-w-0">
+                                <div class="flex items-center gap-2.5 min-w-0">
                                     <span class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-xl shrink-0">
                                         ${zone.icon}
                                     </span>
-                                    <div>
+                                    <div class="min-w-0">
                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                            <h4 class="text-sm font-black text-white">${zone.name}</h4>
-                                            <span class="px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 text-[10px] font-bold border border-red-500/30">
+                                            <h4 class="text-sm font-black text-white truncate">${zone.name}</h4>
+                                            <span class="px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 text-[10px] font-bold border border-red-500/30 truncate">
                                                 ${alert.tag}
                                             </span>
                                         </div>
-                                        <p class="text-[11px] text-slate-400 mt-0.5">${elapsedMin} 分鐘前通報 • 剩餘 ${remMin}:${remSec} 自動解除</p>
+                                        <p class="text-[11px] text-slate-400 mt-0.5 truncate">${elapsedMin} 分鐘前 • 剩餘 ${remMin}:${remSec} 自動解除</p>
                                     </div>
                                 </div>
-                                <span class="flex h-2.5 w-2.5 shrink-0 mt-1">
-                                    <span class="animate-ping absolute inline-flex h-2.5 w-2.5 rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative flex h-2.5 w-2.5 shrink-0 mt-1">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                     <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                                 </span>
                             </div>
 
-                            <p class="mt-3 text-sm text-slate-100 bg-slate-950/50 rounded-xl px-3 py-2.5 border border-slate-800/80 leading-relaxed">
+                            <p class="mt-3 text-sm text-slate-100 bg-slate-950/50 rounded-xl px-3 py-2.5 border border-slate-800/80 leading-relaxed break-words">
                                 「${escapeHtml(alert.note)}」
                             </p>
 
-                            <div class="mt-3 flex items-center gap-2">
-                                <button onclick="confirmSighting('${alert.id}')"
-                                    class="flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition active:scale-95
+                            <div class="mt-3 flex items-center gap-2 w-full">
+                                <button type="button" onclick="confirmSighting('${alert.id}')"
+                                    class="flex-1 min-w-0 py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1 transition active:scale-95 truncate
                                     ${isConfirmedByMe
                                         ? 'bg-amber-500/25 border border-amber-400/50 text-amber-200'
                                         : 'bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white'}">
                                     <span>👀</span>
-                                    <span>${isConfirmedByMe ? '已確認目擊' : '+1 我也看到了'} (${alert.confirmations})</span>
+                                    <span class="truncate">${isConfirmedByMe ? '已確認目擊' : '+1 看到了'} (${alert.confirmations})</span>
                                 </button>
-                                <button onclick="markCleared('${alert.id}')"
-                                    class="py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1 transition active:scale-95">
-                                    <span>✅ 拖車已離開</span>
+                                <button type="button" onclick="markCleared('${alert.id}')"
+                                    class="py-2 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1 transition active:scale-95 shrink-0 whitespace-nowrap">
+                                    <span>✅ 已離開</span>
                                 </button>
                             </div>
                         </article>
                     `;
                 } else {
                     return `
-                        <article class="rounded-2xl bg-slate-800/40 border border-slate-800 p-3.5 opacity-75">
-                            <div class="flex items-center justify-between gap-2">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg grayscale">
-                                        ${zone.icon}
-                                    </span>
-                                    <div>
-                                        <div class="flex items-center gap-2">
-                                            <h4 class="text-xs font-bold text-slate-300">${zone.name}</h4>
-                                            <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
-                                                已撤離 / 解除
-                                            </span>
-                                        </div>
-                                        <p class="text-[11px] text-slate-500 mt-0.5">${elapsedMin} 分鐘前通報 • 累計 ${alert.confirmations} 人確認</p>
+                        <article class="w-full min-w-0 rounded-2xl bg-slate-800/40 border border-slate-800 p-3.5 opacity-75">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <span class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg grayscale shrink-0">
+                                    ${zone.icon}
+                                </span>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h4 class="text-xs font-bold text-slate-300 truncate">${zone.name}</h4>
+                                        <span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold shrink-0">
+                                            已撤離 / 解除
+                                        </span>
                                     </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5 truncate">${elapsedMin} 分鐘前 • 累計 ${alert.confirmations} 人確認</p>
                                 </div>
                             </div>
                         </article>
@@ -892,15 +896,15 @@ html, body {
         // ==========================================
         let toastTimer = null;
         function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.remove('opacity-0', 'translate-y-2');
-            toast.classList.add('opacity-100', 'translate-y-0');
+            const inner = document.getElementById('toast-inner');
+            inner.textContent = message;
+            inner.classList.remove('opacity-0', 'translate-y-2');
+            inner.classList.add('opacity-100', 'translate-y-0');
 
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', 'translate-y-2');
+                inner.classList.remove('opacity-100', 'translate-y-0');
+                inner.classList.add('opacity-0', 'translate-y-2');
             }, 3000);
         }
 

@@ -1,868 +1,299 @@
-<!DOCTYPE html>
-<html lang="zh-Hant" class="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0F172A">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>中山車管會拖吊警報器｜西子灣即時互助系統</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
+const LINE_CHANNEL_ACCESS_TOKEN = '+mr8N8Q4kjFmwnUzWCH6cwcqpWBFHU2l2RUus2YtckLd6t9rQuUGOdQAzm+CFvImIE7ijV788dJrVznFOODfRK7Bv2qhIYzf0fUHuIYKESe1MyrUlnpzsAVgltPqc01D95R/pwWK2Fjg/cu5hn2OgdB04t89/1O/w1cDnyilFU=';
+
+// 【重點】把官方帳號拉進群組並輸入「綁定群組」後，將取得的 C 開頭字串貼到這裡
+const LINE_TARGET_GROUP_ID = '';
+
+// 你的 GitHub Pages 雷達網頁網址（會附在查詢回覆中）
+const RADAR_WEB_URL = 'https://你的帳號.github.io/你的專案名稱/';
+
+const SHEET_NAME = 'Alerts';
+const PROP_SHEET_ID = 'ALERT_SHEET_ID';
+const ALERT_TTL_MS = 15 * 60 * 1000;
+const MERGE_WINDOW_MS = 5 * 60 * 1000;
+
+const ZONE_NAMES = {
+  seawall: '海堤 / 行政大樓旁',
+  mgmt: '管理學院 / 圖資大樓',
+  engineering: '工學院 / 電資大樓',
+  liberal: '文學院 / 藝術大樓',
+  wuling: '武嶺 / 翠亨宿舍區',
+  tunnel: '西子灣隧道口 / 哨船頭'
+};
+
+function getOrCreateSheet() {
+  const props = PropertiesService.getScriptProperties();
+  const savedId = props.getProperty(PROP_SHEET_ID);
+  let ss = null;
+
+  if (savedId) {
+    try {
+      ss = SpreadsheetApp.openById(savedId);
+    } catch (err) {
+      ss = null;
+    }
+  }
+
+  if (!ss) {
+    ss = SpreadsheetApp.create('中山拖吊警報雲端資料庫');
+    props.setProperty(PROP_SHEET_ID, ss.getId());
+  }
+
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['id', 'zoneId', 'tag', 'note', 'createdAt', 'clearedAt', 'confirmations', 'status']);
+  } else if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['id', 'zoneId', 'tag', 'note', 'createdAt', 'clearedAt', 'confirmations', 'status']);
+  }
+
+  return sheet;
+}
+
+function readAlertsList(sheet, now) {
+  const rows = sheet.getDataRange().getValues();
+  const list = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const [id, zoneId, tag, note, createdAt, clearedAt, confirmations, status] = rows[i];
+    if (!id) continue;
+
+    const createdNum = Number(createdAt) || now;
+    let currentStatus = status === 'cleared' ? 'cleared' : 'active';
+    let currentClearedAt = clearedAt ? Number(clearedAt) : null;
+
+    if (currentStatus === 'active' && (now - createdNum) >= ALERT_TTL_MS) {
+      currentStatus = 'cleared';
+      currentClearedAt = now;
+      sheet.getRange(i + 1, 6).setValue(currentClearedAt);
+      sheet.getRange(i + 1, 8).setValue('cleared');
+    }
+
+    list.push({
+      id: String(id),
+      zoneId: String(zoneId || 'seawall'),
+      tag: String(tag || '拖車巡邏移動中'),
+      note: String(note || ''),
+      createdAt: createdNum,
+      clearedAt: currentClearedAt,
+      confirmations: Math.max(1, Number(confirmations) || 1),
+      status: currentStatus
+    });
+  }
+
+  list.sort((a, b) => b.createdAt - a.createdAt);
+  return list.slice(0, 30);
+}
+
+// 接收網頁 GET 請求（同步、通報、測試、+1、解除）
+function doGet(e) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const data = (e && e.parameter) ? e.parameter : {};
+    const action = String(data.action || 'list').toLowerCase();
+    const sheet = getOrCreateSheet();
+    const rows = sheet.getDataRange().getValues();
+    const now = Date.now();
+
+    if (action === 'list') {
+      return jsonResponse({
+        ok: true,
+        alerts: readAlertsList(sheet, now)
+      });
+    }
+
+    if (action === 'test') {
+      const lineRes = sendLineAlert(
+        `🚨 【中山拖吊警報】${data.area || '群組推播測試'}\n狀況：${data.note || '群組單次推播測試成功（僅扣 1 則額度）！'}`
+      );
+      return jsonResponse({
+        ok: lineRes.ok,
+        lineStatus: lineRes.code,
+        lineBody: lineRes.body,
+        alerts: readAlertsList(sheet, now)
+      });
+    }
+
+    if (action === 'confirm' && data.alertId) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === String(data.alertId)) {
+          const nextCount = (Number(rows[i][6]) || 1) + 1;
+          sheet.getRange(i + 1, 7).setValue(nextCount);
+          return jsonResponse({
+            ok: true,
+            confirmations: nextCount,
+            alerts: readAlertsList(sheet, now)
+          });
+        }
+      }
+      return jsonResponse({ ok: false, error: 'Alert not found' });
+    }
+
+    if (action === 'cleared' && data.alertId) {
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === String(data.alertId)) {
+          sheet.getRange(i + 1, 6).setValue(now);
+          sheet.getRange(i + 1, 8).setValue('cleared');
+          const lineRes = sendLineAlert(
+            `✅ 【中山拖吊解除】${data.area || '校內區域'} — ${data.note || '同學回報拖吊車已離開現場，解除警戒'}`
+          );
+          return jsonResponse({
+            ok: true,
+            lineStatus: lineRes.code,
+            lineOk: lineRes.ok,
+            alerts: readAlertsList(sheet, now)
+          });
+        }
+      }
+      return jsonResponse({ ok: false, error: 'Alert not found' });
+    }
+
+    // 新增通報並推播到指定群組（1 次只扣 1 則）
+    const zoneId = String(data.zoneId || 'seawall');
+    const tag = String(data.tag || '拖車巡邏移動中');
+    const area = String(data.area || ZONE_NAMES[zoneId] || '校內區域');
+    const note = String(data.note || `${tag} — ${area}發現車管會拖吊車，請附近同學注意！`);
+
+    for (let i = 1; i < rows.length; i++) {
+      const rowCreated = Number(rows[i][4]) || 0;
+      if (
+        String(rows[i][1]) === zoneId &&
+        String(rows[i][7]) === 'active' &&
+        (now - rowCreated) < MERGE_WINDOW_MS
+      ) {
+        const nextCount = (Number(rows[i][6]) || 1) + 1;
+        sheet.getRange(i + 1, 7).setValue(nextCount);
+        if (data.note) sheet.getRange(i + 1, 4).setValue(note);
+        return jsonResponse({
+          ok: true,
+          merged: true,
+          id: String(rows[i][0]),
+          confirmations: nextCount,
+          alerts: readAlertsList(sheet, now)
+        });
+      }
+    }
+
+    const newId = 'alert-' + now;
+    sheet.appendRow([newId, zoneId, tag, note, now, '', 1, 'active']);
+    const lineRes = sendLineAlert(`🚨 【中山拖吊警報】${area}\n狀況：${note}\n🗺️ 即時雷達：${RADAR_WEB_URL}`);
+
+    return jsonResponse({
+      ok: true,
+      id: newId,
+      lineStatus: lineRes.code,
+      lineOk: lineRes.ok,
+      alerts: readAlertsList(sheet, now)
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: err.message });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 接收 LINE Webhook 事件（免費回覆群組 ID 與即時查詢，0 額度消耗）
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ ok: true });
+    }
+    const body = JSON.parse(e.postData.contents);
+    const events = body.events || [];
+
+    events.forEach(ev => {
+      if (ev.type === 'message' && ev.message && ev.message.type === 'text') {
+        const text = String(ev.message.text || '').trim();
+        const replyToken = ev.replyToken;
+
+        // 1. 在群組輸入「綁定群組」取得 groupId
+        if (text === '綁定群組' || text === '群組ID' || text === 'groupid') {
+          const gid = ev.source && ev.source.groupId;
+          if (gid) {
+            replyLineText(replyToken, `✅ 偵測到此群組 ID：\n${gid}\n\n請將這串 C 開頭代碼貼入 GAS 的 LINE_TARGET_GROUP_ID 並重新部署！`);
+          } else {
+            replyLineText(replyToken, '⚠️ 請將官方帳號邀請進「一般 LINE 群組」後，在群組內輸入「綁定群組」。');
+          }
+          return;
+        }
+
+        // 2. 輸入「查詢 / 拖吊 / 現況」免費秒回目前校內狀況（不扣 200 則額度）
+        if (text.includes('查詢') || text.includes('拖吊') || text.includes('現況') || text.includes('雷達')) {
+          const sheet = getOrCreateSheet();
+          const list = readAlertsList(sheet, Date.now());
+          const active = list.filter(a => a.status === 'active');
+
+          if (active.length === 0) {
+            replyLineText(replyToken, `✅ 目前西子灣校區安全無進行中拖吊通報。\n\n🚨 若發現拖吊車請點此一鍵通報：\n${RADAR_WEB_URL}`);
+          } else {
+            const lines = active.map(a => {
+              const areaName = ZONE_NAMES[a.zoneId] || a.zoneId;
+              const mins = Math.max(1, Math.floor((Date.now() - a.createdAt) / 60000));
+              return `• ${areaName}（${mins}分鐘前｜${a.confirmations}人確認）\n  ${a.note}`;
+            });
+            replyLineText(replyToken, `⚠️ 目前校內有 ${active.length} 處拖吊警戒：\n\n${lines.join('\n\n')}\n\n🗺️ 開啟雷達 / 回報離開：\n${RADAR_WEB_URL}`);
           }
         }
       }
-    }
-  </script>
-  <style>
-    * { -webkit-tap-highlight-color: transparent; }
-    body {
-      background-color: #090D16;
-      color: #F8FAFC;
-      font-family: 'Noto Sans TC', 'Inter', sans-serif;
-      overflow-x: hidden;
-    }
-    .glass-card {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(51, 65, 85, 0.6);
-    }
-    .siren-glow {
-      box-shadow: 0 0 32px rgba(239, 68, 68, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    }
-    .siren-glow:active {
-      transform: scale(0.985);
-    }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(14px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .animate-slide-up {
-      animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #090D16; }
-    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
-  </style>
-</head>
-<body class="min-h-screen flex flex-col items-center justify-between pb-10">
-
-  <!-- 頂部導覽列 -->
-  <header class="w-full sticky top-0 z-30 glass-card border-b border-slate-800/80">
-    <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div id="statusBeacon" class="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shadow-lg">
-          <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-base font-extrabold tracking-tight text-white leading-tight">中山車管會拖吊警報器</h1>
-          <p class="text-[11px] text-slate-400 font-medium">西子灣即時互助通報系統 v1.5</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button id="btnWebhook" onclick="openWebhookModal()" class="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 transition" title="LINE 與雲端同步設定">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-
-        <button id="btnAudio" onclick="toggleAudio()" class="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 transition" title="警報音效開關">
-          <svg id="iconAudioOn" class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-          </svg>
-          <svg id="iconAudioOff" class="w-4 h-4 text-slate-500 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-          </svg>
-        </button>
-
-        <button id="btnPush" onclick="requestPushPermission()" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="pushLabel">LINE 推播就緒</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="w-full max-w-lg mx-auto px-4 pt-4 space-y-4">
-
-    <!-- 雲端連線與全校狀態橫幅 -->
-    <div id="liveBanner" class="rounded-2xl px-4 py-2.5 bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
-      <div class="flex items-center gap-2">
-        <span id="cloudDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-        <span id="cloudStatusText" class="text-slate-300 font-medium">連線待命・通報直發 LINE</span>
-      </div>
-      <span id="activeSummaryBadge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
-        ✅ 目前全校安全無拖吊
-      </span>
-    </div>
-
-    <!-- 核心一鍵緊急通報按鈕 -->
-    <section>
-      <button onclick="openReportModal()" class="w-full relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-red-600 to-rose-700 p-5 text-left siren-glow transition-all duration-150 border border-red-400/30 group">
-        <div class="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/10 blur-xl group-hover:scale-125 transition-transform"></div>
-        <div class="flex items-center justify-between relative z-10">
-          <div class="flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/25 shrink-0">
-              <span class="text-3xl animate-bounce">🚨</span>
-            </div>
-            <div>
-              <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/25 text-red-100 text-[11px] font-bold tracking-wider uppercase mb-1">
-                SOS 緊急廣播
-              </div>
-              <h2 class="text-xl font-black text-white tracking-tight">發現拖吊車！立即通報</h2>
-              <p class="text-xs text-red-100/90 mt-0.5">點擊選擇校內區域，一秒通知全校同學</p>
-            </div>
-          </div>
-          <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
-        </div>
-      </button>
-    </section>
-
-    <!-- 西子灣校區即時熱點雷達 -->
-    <section class="glass-card rounded-3xl p-4 space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-base">🗺️</span>
-          <h3 class="text-sm font-bold text-slate-200">西子灣校區即時熱點雷達</h3>
-        </div>
-        <button onclick="selectZoneFilter('ALL')" id="btnResetFilter" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hidden">
-          顯示全部區域
-        </button>
-      </div>
-
-      <div class="relative w-full h-44 rounded-2xl bg-[#0B1324] border border-slate-800/90 overflow-hidden select-none">
-        <svg viewBox="0 0 400 180" class="w-full h-full">
-          <path d="M 0,0 L 115,0 Q 100,70 112,120 Q 125,155 175,180 L 0,180 Z" fill="#0F2942" opacity="0.7" />
-          <text x="24" y="156" fill="#38BDF8" font-size="9" opacity="0.6" font-weight="bold">台灣海峽 / 西子灣海域</text>
-          <path d="M 165,0 Q 250,40 400,25 L 400,0 Z" fill="#132A1E" opacity="0.55" />
-          <text x="295" y="22" fill="#4ADE80" font-size="9" opacity="0.5">柴山山脈</text>
-          <path d="M 118,132 L 195,132 L 245,82 L 325,52 M 195,132 L 350,136 M 135,55 L 118,132" stroke="#334155" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-          <g id="radarNodes"></g>
-        </svg>
-
-        <div class="absolute bottom-2 right-2.5 flex items-center gap-3 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-800 text-[10px] text-slate-300">
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>拖吊警戒</span>
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>安全無虞</span>
-        </div>
-      </div>
-
-      <div id="zoneChips" class="flex gap-1.5 overflow-x-auto pb-1"></div>
-    </section>
-
-    <!-- 即時通報動態清單 -->
-    <section class="space-y-2.5">
-      <div class="flex items-center justify-between px-1">
-        <div class="flex items-center gap-2">
-          <h3 class="text-sm font-bold text-slate-200">即時通報動態</h3>
-          <span id="activeCountPill" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-slate-400">0 則進行中</span>
-        </div>
-        <button onclick="manualSyncNow()" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1">
-          <span>🔄 立即更新</span>
-        </button>
-      </div>
-
-      <div id="alertFeed" class="space-y-2.5"></div>
-    </section>
-
-  </main>
-
-  <!-- 緊急通報選擇彈窗 -->
-  <div id="reportModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-    <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto glass-card rounded-3xl border border-slate-700/80 p-5 space-y-4 animate-slide-up shadow-2xl">
-      <div class="flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-black text-white">📍 拖吊車目前在哪裡？</h3>
-          <p class="text-xs text-slate-400">選擇地點與狀態，立即發送 LINE 廣播與全校警報</p>
-        </div>
-        <button onclick="closeReportModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">✕</button>
-      </div>
-
-      <div id="modalZoneGrid" class="grid grid-cols-2 gap-2"></div>
-
-      <div>
-        <label class="block text-xs font-bold text-slate-300 mb-1.5">現場狀況速選</label>
-        <div id="statusTags" class="flex flex-wrap gap-1.5"></div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-bold text-slate-300 mb-1.5">補充細節（選填）</label>
-        <input id="customNote" type="text" maxlength="60" placeholder="例如：白色拖吊車往海堤方向開、正在拍紅線..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
-      </div>
-
-      <button id="btnSubmitReport" onclick="submitAlert()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black text-base shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2">
-        <span>🚨 確認發送緊急警報</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- LINE Webhook 與雲端設定彈窗 -->
-  <div id="webhookModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-    <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto glass-card rounded-3xl border border-slate-700/80 p-5 space-y-4 animate-slide-up shadow-2xl">
-      <div class="flex items-center justify-between">
-        <div>
-          <h3 class="text-lg font-black text-white">🔗 LINE 推播與雲端中繼站</h3>
-          <p class="text-xs text-slate-400">已內建預設 Google Apps Script 網址，可在此測試推播</p>
-        </div>
-        <button onclick="closeWebhookModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">✕</button>
-      </div>
-
-      <div class="space-y-2">
-        <label class="block text-xs font-bold text-slate-300">Google Apps Script 網頁應用程式網址</label>
-        <input id="webhookInput" type="url" placeholder="https://script.google.com/macros/s/...../exec" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono">
-      </div>
-
-      <div id="webhookStatusBox" class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-400 leading-relaxed">
-        狀態：<span class="text-slate-300 font-semibold">尚未設定</span>
-      </div>
-
-      <div class="grid grid-cols-3 gap-2">
-        <button onclick="testWebhookPush()" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition">
-          📡 測試推播
-        </button>
-        <button onclick="resetDefaultWebhook()" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-amber-300 transition">
-          🔄 恢復預設
-        </button>
-        <button onclick="saveWebhookUrl()" class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-black text-white transition">
-          💾 儲存網址
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 底部浮動 Toast 提示 -->
-  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-slate-700 text-xs font-bold text-white shadow-2xl opacity-0 pointer-events-none transition-opacity duration-200 flex items-center gap-2 whitespace-nowrap">
-    <span id="toastIcon">🔔</span>
-    <span id="toastMsg">已發送全校警報</span>
-  </div>
-
-  <script>
-    const DEFAULT_GAS_LINE_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzyaHPKc2bslxhL0GPQ2kgRBn7-pbwwBeTPe0fXhpaE56M5HXmSHuytI3hZzNsZ2rjzxA/exec';
-
-    const STALE_WEBHOOK_IDS = [
-      'AKfycbxaRaqvLRElU5cHWvdHWMuya1HWPrU8y8h6F8R6oDycev7UuxiwqZ1HE_YH7Mixe7c',
-      'AKfycbw5Tjn_oYENKrN54V281Oj59ruScKiEmpoocHEFLdIgjGw2fmC5ezHJNH6LIhXuFHinjw',
-      'AKfycbxvyC7YU9gR6CjkOgwLdM-C9-oMSV2LJIqZgO9bJvcuaF__kogTHz5Gh-3ZjerzMboUjg',
-      'AKfycbxY-v9w1ZchSox5BEWrhJ1sFhKHUGCexMZ7_I2M2IkwjR2o41UEeQN7H9V6-P8l_VsgkA',
-      'AKfycbz1eGSkQ2ZM97hAljPD1TRpbslu6efX8zkErWX25P8FGaUQMzKe3PeQPjAc51n68QQ3Lg',
-      'AKfycby6FxCT2UrSsrn41CpK0mScJ7U91kb-jMGxxx4JQKtEB29d5W3K5PFQV7vtWdi_zHYpyA',
-      'AKfycbyv0nKZVtDVrhrVefbpb0728EnRBdpPOjLZTvCGuAXu6qfsqWS9VJ5-G4zcTbZ_tvFJ_g',
-      'AKfycbx75W91fxrn0TUOMhpLPjnqeqgSgsKtamq3h7M8UDX0MjH_aJONtKxlEz-odaDwp02sDQ'
-    ];
-
-    const ZONES = [
-      { id: 'seawall', name: '海堤 / 行政大樓旁', short: '海堤', icon: '🌊', x: 118, y: 132 },
-      { id: 'mgmt', name: '管理學院 / 圖資大樓', short: '管理學院', icon: '🏢', x: 195, y: 132 },
-      { id: 'engineering', name: '工學院 / 電資大樓', short: '工學院', icon: '⚙️', x: 245, y: 82 },
-      { id: 'liberal', name: '文學院 / 藝術大樓', short: '文學院', icon: '🏛️', x: 135, y: 55 },
-      { id: 'wuling', name: '武嶺 / 翠亨宿舍區', short: '武嶺', icon: '🏠', x: 325, y: 52 },
-      { id: 'tunnel', name: '西子灣隧道口 / 哨船頭', short: '西子灣隧道口', icon: '🚇', x: 350, y: 136 }
-    ];
-
-    const STATUS_TAGS = [
-      '拖車巡邏移動中',
-      '正在開單 / 準備上夾',
-      '已拖走一台往出口',
-      '駐點拍照取締中'
-    ];
-
-    const STORAGE_KEY = 'nsysu_tow_alerts_v4';
-    const WEBHOOK_KEY = 'nsysu_tow_gas_webhook_v2';
-    const CONFIRMED_IDS_KEY = 'nsysu_tow_confirmed_ids_v1';
-    const ALERT_TTL_MS = 15 * 60 * 1000;
-
-    let alerts = [];
-    let selectedZoneId = ZONES[0].id;
-    let selectedTag = STATUS_TAGS[0];
-    let activeFilterZone = 'ALL';
-    let audioEnabled = true;
-    let lastKnownLatestId = null;
-
-    function getWebhookUrl() {
-      const saved = (localStorage.getItem(WEBHOOK_KEY) || '').trim();
-      if (!saved) {
-        localStorage.setItem(WEBHOOK_KEY, DEFAULT_GAS_LINE_WEBHOOK_URL);
-        return DEFAULT_GAS_LINE_WEBHOOK_URL;
-      }
-      if (STALE_WEBHOOK_IDS.some(id => saved.includes(id))) {
-        localStorage.setItem(WEBHOOK_KEY, DEFAULT_GAS_LINE_WEBHOOK_URL);
-        return DEFAULT_GAS_LINE_WEBHOOK_URL;
-      }
-      return saved;
-    }
-
-    function getConfirmedSet() {
-      try {
-        return new Set(JSON.parse(localStorage.getItem(CONFIRMED_IDS_KEY) || '[]'));
-      } catch {
-        return new Set();
-      }
-    }
-
-    function markConfirmedLocal(alertId) {
-      const set = getConfirmedSet();
-      set.add(String(alertId));
-      localStorage.setItem(CONFIRMED_IDS_KEY, JSON.stringify([...set]));
-    }
-
-    function initApp() {
-      getWebhookUrl();
-      loadLocalAlerts();
-      renderModalZones();
-      renderStatusTags();
-      renderAll();
-      updateWebhookBadge();
-
-      fetchCloudAlerts(true);
-      setInterval(() => fetchCloudAlerts(false), 12000);
-      setInterval(() => {
-        checkAutoExpire();
-        renderAll();
-      }, 1000);
-    }
-
-    function loadLocalAlerts() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        alerts = raw ? JSON.parse(raw) : [];
-      } catch {
-        alerts = [];
-      }
-    }
-
-    function saveLocalAlerts() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
-    }
-
-    function checkAutoExpire() {
-      const now = Date.now();
-      let changed = false;
-      alerts.forEach(a => {
-        if (a.status === 'active' && (now - a.createdAt) >= ALERT_TTL_MS) {
-          a.status = 'cleared';
-          a.clearedAt = now;
-          changed = true;
-        }
-      });
-      if (changed) saveLocalAlerts();
-    }
-
-    function applyCloudAlerts(cloudList) {
-      if (!Array.isArray(cloudList)) return;
-      const prevActiveIds = new Set(alerts.filter(a => a.status === 'active').map(a => a.id));
-      alerts = cloudList.map(item => ({
-        id: String(item.id),
-        zoneId: String(item.zoneId),
-        tag: String(item.tag || '拖車巡邏移動中'),
-        note: String(item.note || ''),
-        createdAt: Number(item.createdAt) || Date.now(),
-        clearedAt: item.clearedAt ? Number(item.clearedAt) : null,
-        confirmations: Math.max(1, Number(item.confirmations) || 1),
-        status: item.status === 'cleared' ? 'cleared' : 'active'
-      }));
-      saveLocalAlerts();
-      renderAll();
-
-      const newestActive = alerts.find(a => a.status === 'active');
-      if (newestActive && !prevActiveIds.has(newestActive.id) && lastKnownLatestId !== null && newestActive.id !== lastKnownLatestId) {
-        const z = ZONES.find(x => x.id === newestActive.zoneId);
-        playSirenBeep();
-        sendBrowserNotification(`🚨 ${z ? z.name : '校內'} 發現拖吊車！`, newestActive.note);
-      }
-      if (newestActive) lastKnownLatestId = newestActive.id;
-    }
-
-    function buildGetUrl(baseUrl, params = {}) {
-      const urlObj = new URL(baseUrl);
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && String(v) !== '') {
-          urlObj.searchParams.set(k, String(v));
-        }
-      });
-      urlObj.searchParams.set('t', String(Date.now()));
-      return urlObj.toString();
-    }
-
-    async function callGasGet(params = {}) {
-      const url = getWebhookUrl();
-      if (!url) return { ok: false, error: 'Missing webhook URL' };
-      const fullUrl = buildGetUrl(url, params);
-      const res = await fetch(fullUrl, {
-        method: 'GET',
-        cache: 'no-store'
-      });
-      return await res.json();
-    }
-
-    async function fetchCloudAlerts(isManual) {
-      const dot = document.getElementById('cloudDot');
-      const statusText = document.getElementById('cloudStatusText');
-
-      try {
-        const data = await callGasGet({ action: 'list' });
-        if (data && data.ok && Array.isArray(data.alerts)) {
-          applyCloudAlerts(data.alerts);
-          dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-          statusText.textContent = '雲端即時同步中・通報直發 LINE';
-          if (isManual) showToast('✅', '已與雲端資料庫完成同步');
-        } else {
-          throw new Error((data && data.error) || 'Invalid response');
-        }
-      } catch (err) {
-        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
-        statusText.textContent = '連線待命・通報直發 LINE';
-        if (isManual) showToast('⚠️', '尚未讀取到雲端資料，請確認 GAS 權限設為所有人');
-      }
-    }
-
-    function manualSyncNow() {
-      fetchCloudAlerts(true);
-    }
-
-    function openReportModal(preselectZoneId) {
-      if (preselectZoneId) selectedZoneId = preselectZoneId;
-      renderModalZones();
-      document.getElementById('reportModal').classList.remove('hidden');
-    }
-
-    function closeReportModal() {
-      document.getElementById('reportModal').classList.add('hidden');
-    }
-
-    function renderModalZones() {
-      const container = document.getElementById('modalZoneGrid');
-      container.innerHTML = ZONES.map(z => {
-        const active = z.id === selectedZoneId;
-        return `
-          <button type="button" onclick="selectModalZone('${z.id}')"
-            class="p-3 rounded-2xl border text-left transition flex items-center gap-2.5 ${
-              active
-                ? 'bg-red-500/20 border-red-500 text-white shadow-inner'
-                : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
-            }">
-            <span class="text-xl">${z.icon}</span>
-            <span class="text-xs font-bold leading-snug">${z.name}</span>
-          </button>
-        `;
-      }).join('');
-    }
-
-    function selectModalZone(id) {
-      selectedZoneId = id;
-      renderModalZones();
-    }
-
-    function renderStatusTags() {
-      const container = document.getElementById('statusTags');
-      container.innerHTML = STATUS_TAGS.map(tag => {
-        const active = tag === selectedTag;
-        return `
-          <button type="button" onclick="selectStatusTag('${tag}')"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-              active
-                ? 'bg-amber-500/20 border-amber-400 text-amber-300'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-            }">
-            ${tag}
-          </button>
-        `;
-      }).join('');
-    }
-
-    function selectStatusTag(tag) {
-      selectedTag = tag;
-      renderStatusTags();
-    }
-
-    async function submitAlert() {
-      const zone = ZONES.find(z => z.id === selectedZoneId);
-      const customNote = document.getElementById('customNote').value.trim();
-      const finalNote = customNote ? `${selectedTag}：${customNote}` : `${selectedTag} — ${zone.name}發現車管會拖吊車，請附近同學注意！`;
-      const btn = document.getElementById('btnSubmitReport');
-
-      btn.disabled = true;
-      btn.innerHTML = '<span>⏳ 正在同步雲端並發送 LINE...</span>';
-
-      try {
-        const data = await callGasGet({
-          action: 'report',
-          area: zone.name,
-          zoneId: zone.id,
-          tag: selectedTag,
-          note: finalNote
-        });
-
-        if (data && data.ok) {
-          if (data.id) markConfirmedLocal(data.id);
-          if (Array.isArray(data.alerts)) applyCloudAlerts(data.alerts);
-          document.getElementById('customNote').value = '';
-          closeReportModal();
-          playSirenBeep();
-          sendBrowserNotification(`🚨 ${zone.name} 發現拖吊車！`, finalNote);
-          showToast('🚨', `已通報「${zone.short}」並同步 LINE 與雲端！`);
-        } else {
-          showToast('⚠️', (data && data.error) || '雲端或 LINE 傳送失敗，請檢查 GAS 部署');
-        }
-      } catch (err) {
-        showToast('❌', '網路傳送失敗，請檢查連線後再試');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span>🚨 確認發送緊急警報</span>';
-      }
-    }
-
-    async function confirmAlert(alertId) {
-      const confirmedSet = getConfirmedSet();
-      if (confirmedSet.has(String(alertId))) {
-        showToast('👀', '你已經確認過這則通報囉！');
-        return;
-      }
-
-      const target = alerts.find(a => a.id === alertId);
-      if (!target || target.status !== 'active') return;
-
-      try {
-        const data = await callGasGet({
-          action: 'confirm',
-          alertId: alertId
-        });
-
-        if (data && data.ok) {
-          markConfirmedLocal(alertId);
-          if (Array.isArray(data.alerts)) applyCloudAlerts(data.alerts);
-          const nextCount = data.confirmations || ((target.confirmations || 1) + 1);
-          showToast('👀', `已 +1 確認目擊（目前共 ${nextCount} 人確認）`);
-        } else {
-          showToast('⚠️', (data && data.error) || '確認目擊同步失敗');
-        }
-      } catch (err) {
-        showToast('❌', '網路傳送失敗，請檢查連線後再試');
-      }
-    }
-
-    async function clearAlert(alertId) {
-      const target = alerts.find(a => a.id === alertId);
-      if (!target || target.status !== 'active') return;
-
-      const z = ZONES.find(x => x.id === target.zoneId);
-
-      try {
-        const data = await callGasGet({
-          action: 'cleared',
-          alertId: alertId,
-          area: z ? z.name : '校內區域',
-          note: '同學回報拖吊車已離開現場，解除警戒'
-        });
-
-        if (data && data.ok) {
-          if (Array.isArray(data.alerts)) applyCloudAlerts(data.alerts);
-          showToast('✅', '已解除該區域警戒並推播通知全校');
-        } else {
-          showToast('⚠️', (data && data.error) || '解除警戒同步失敗');
-        }
-      } catch (err) {
-        showToast('❌', '網路傳送失敗，請檢查連線後再試');
-      }
-    }
-
-    function openWebhookModal() {
-      const currentUrl = getWebhookUrl();
-      document.getElementById('webhookInput').value = currentUrl;
-      updateWebhookStatusText(currentUrl);
-      document.getElementById('webhookModal').classList.remove('hidden');
-    }
-
-    function closeWebhookModal() {
-      document.getElementById('webhookModal').classList.add('hidden');
-    }
-
-    function updateWebhookStatusText(url) {
-      const box = document.getElementById('webhookStatusBox');
-      if (url && url.startsWith('https://script.google.com/')) {
-        box.innerHTML = `✅ <span class="text-emerald-400 font-bold">已連線至 LINE 與雲端資料庫</span><br><span class="text-[11px] text-slate-400 break-all">${url}</span>`;
-      } else {
-        box.innerHTML = `狀態：<span class="text-amber-400 font-semibold">尚未設定有效的 Google Apps Script 網址</span>`;
-      }
-    }
-
-    function updateWebhookBadge() {
-      const url = getWebhookUrl();
-      const btn = document.getElementById('btnWebhook');
-      if (url && url.startsWith('https://script.google.com/')) {
-        btn.classList.remove('text-slate-300', 'border-slate-700');
-        btn.classList.add('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/10');
-      } else {
-        btn.classList.add('text-slate-300', 'border-slate-700');
-        btn.classList.remove('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/10');
-      }
-    }
-
-    function resetDefaultWebhook() {
-      localStorage.setItem(WEBHOOK_KEY, DEFAULT_GAS_LINE_WEBHOOK_URL);
-      document.getElementById('webhookInput').value = DEFAULT_GAS_LINE_WEBHOOK_URL;
-      updateWebhookStatusText(DEFAULT_GAS_LINE_WEBHOOK_URL);
-      updateWebhookBadge();
-      fetchCloudAlerts(true);
-    }
-
-    function saveWebhookUrl() {
-      const val = document.getElementById('webhookInput').value.trim();
-      if (!val || !val.startsWith('https://script.google.com/')) {
-        showToast('⚠️', '請貼上以 https://script.google.com/ 開頭的網址');
-        return;
-      }
-      localStorage.setItem(WEBHOOK_KEY, val);
-      updateWebhookStatusText(val);
-      updateWebhookBadge();
-      showToast('💾', '已儲存 LINE 與雲端資料庫網址！');
-      fetchCloudAlerts(true);
-    }
-
-    async function testWebhookPush() {
-      const val = document.getElementById('webhookInput').value.trim();
-      if (!val || !val.startsWith('https://script.google.com/')) {
-        showToast('⚠️', '請先貼上有效的 Google Apps Script 網址');
-        return;
-      }
-      localStorage.setItem(WEBHOOK_KEY, val);
-      updateWebhookStatusText(val);
-      updateWebhookBadge();
-
-      showToast('📡', '正在發送測試推播至 LINE...');
-      try {
-        const data = await callGasGet({
-          action: 'test',
-          area: '連線測試（工學院 / 電資大樓）',
-          note: '中山車管會拖吊警報器 LINE 官方帳號推播測試成功！'
-        });
-        if (data && data.ok) {
-          showToast('✅', '測試成功！請查看你的手機 LINE 訊息');
-        } else {
-          showToast('❌', `推播失敗（狀態 ${data && data.lineStatus ? data.lineStatus : '未知'}），請檢查 LINE Token`);
-        }
-      } catch (err) {
-        showToast('❌', '網路傳送失敗，請確認 GAS 部署權限為「所有人」');
-      }
-    }
-
-    function selectZoneFilter(zoneId) {
-      activeFilterZone = (activeFilterZone === zoneId && zoneId !== 'ALL') ? 'ALL' : zoneId;
-      document.getElementById('btnResetFilter').classList.toggle('hidden', activeFilterZone === 'ALL');
-      renderAll();
-    }
-
-    function renderAll() {
-      const activeAlerts = alerts.filter(a => a.status === 'active');
-      const activeZoneIds = new Set(activeAlerts.map(a => a.zoneId));
-
-      const summaryBadge = document.getElementById('activeSummaryBadge');
-      const activeCountPill = document.getElementById('activeCountPill');
-      if (activeAlerts.length > 0) {
-        summaryBadge.className = 'px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 font-bold animate-pulse';
-        summaryBadge.textContent = `⚠️ 校內警戒中 (${activeAlerts.length} 處通報)`;
-        activeCountPill.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-400';
-        activeCountPill.textContent = `${activeAlerts.length} 則進行中`;
-      } else {
-        summaryBadge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold';
-        summaryBadge.textContent = '✅ 目前全校安全無拖吊';
-        activeCountPill.className = 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-slate-400';
-        activeCountPill.textContent = '0 則進行中';
-      }
-
-      const radarNodes = document.getElementById('radarNodes');
-      radarNodes.innerHTML = ZONES.map(z => {
-        const isDanger = activeZoneIds.has(z.id);
-        const isSelected = activeFilterZone === z.id;
-        const fill = isDanger ? '#EF4444' : '#10B981';
-        return `
-          <g class="cursor-pointer" onclick="selectZoneFilter('${z.id}')">
-            ${isDanger ? `<circle cx="${z.x}" cy="${z.y}" r="14" fill="#EF4444" opacity="0.28"><animate attributeName="r" from="6" to="18" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" from="0.5" to="0" dur="1.4s" repeatCount="indefinite"/></circle>` : ''}
-            ${isSelected ? `<circle cx="${z.x}" cy="${z.y}" r="11" fill="none" stroke="#38BDF8" stroke-width="2" />` : ''}
-            <circle cx="${z.x}" cy="${z.y}" r="5.5" fill="${fill}" stroke="#090D16" stroke-width="1.5" />
-            <rect x="${z.x - 24}" y="${z.y + 8}" width="48" height="14" rx="4" fill="${isDanger ? '#7F1D1D' : '#0F172A'}" opacity="0.92" />
-            <text x="${z.x}" y="${z.y + 18}" text-anchor="middle" fill="${isDanger ? '#FECACA' : '#CBD5E1'}" font-size="8.5" font-weight="bold">${z.short}</text>
-          </g>
-        `;
-      }).join('');
-
-      const zoneChips = document.getElementById('zoneChips');
-      zoneChips.innerHTML = ZONES.map(z => {
-        const isDanger = activeZoneIds.has(z.id);
-        const isSelected = activeFilterZone === z.id;
-        return `
-          <button onclick="selectZoneFilter('${z.id}')"
-            class="px-2.5 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap border transition flex items-center gap-1.5 ${
-              isSelected
-                ? 'bg-sky-500/20 border-sky-400 text-sky-300'
-                : isDanger
-                  ? 'bg-red-500/15 border-red-500/40 text-red-300'
-                  : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200'
-            }">
-            <span class="w-1.5 h-1.5 rounded-full ${isDanger ? 'bg-red-500 animate-ping' : 'bg-emerald-400'}"></span>
-            <span>${z.short}</span>
-          </button>
-        `;
-      }).join('');
-
-      const feed = document.getElementById('alertFeed');
-      const confirmedSet = getConfirmedSet();
-      const filtered = activeFilterZone === 'ALL'
-        ? alerts
-        : alerts.filter(a => a.zoneId === activeFilterZone);
-
-      if (filtered.length === 0) {
-        feed.innerHTML = `
-          <div class="glass-card rounded-3xl p-8 text-center space-y-2">
-            <div class="text-3xl">🛵</div>
-            <p class="text-sm font-bold text-slate-300">目前尚無真實拖吊通報紀錄</p>
-            <p class="text-xs text-slate-500">若在校內發現拖吊車，點擊上方紅色按鈕即可即時通知全校與 LINE</p>
-          </div>
-        `;
-        return;
-      }
-
-      const now = Date.now();
-      feed.innerHTML = filtered.map(a => {
-        const z = ZONES.find(x => x.id === a.zoneId) || ZONES[0];
-        const isActive = a.status === 'active';
-        const elapsedMin = Math.max(1, Math.floor((now - a.createdAt) / 60000));
-        const remainSec = Math.max(0, Math.floor((ALERT_TTL_MS - (now - a.createdAt)) / 1000));
-        const remainMinStr = `${String(Math.floor(remainSec / 60)).padStart(2, '0')}:${String(remainSec % 60).padStart(2, '0')}`;
-        const alreadyConfirmed = confirmedSet.has(String(a.id));
-
-        return `
-          <article class="glass-card rounded-3xl p-4 border transition ${
-            isActive ? 'border-red-500/45 bg-gradient-to-b from-red-950/25 to-slate-900/90' : 'border-slate-800/80 opacity-65'
-          }">
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex items-center gap-2.5">
-                <div class="w-10 h-10 rounded-2xl ${isActive ? 'bg-red-500/20 border border-red-500/40' : 'bg-slate-800 border border-slate-700'} flex items-center justify-center text-xl shrink-0">
-                  ${z.icon}
-                </div>
-                <div>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <h4 class="text-sm font-black text-white">${z.name}</h4>
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      isActive ? 'bg-red-500/25 text-red-300 border border-red-500/30' : 'bg-slate-800 text-slate-400'
-                    }">
-                      ${isActive ? a.tag : '已解除警戒'}
-                    </span>
-                  </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">
-                    ${elapsedMin} 分鐘前通報 · ${isActive ? `剩餘 ${remainMinStr} 自動解除` : '拖吊車已離開現場'}
-                  </p>
-                </div>
-              </div>
-
-              ${isActive ? `
-                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/20 text-red-400 text-[10px] font-black shrink-0">
-                  <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-                </span>
-              ` : ''}
-            </div>
-
-            <p class="mt-3 text-xs text-slate-200 leading-relaxed bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800/80">
-              「${a.note}」
-            </p>
-
-            ${isActive ? `
-              <div class="mt-3 flex items-center gap-2">
-                <button onclick="confirmAlert('${a.id}')" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                  alreadyConfirmed
-                    ? 'bg-amber-500/20 border-amber-400/50 text-amber-200'
-                    : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300'
-                }">
-                  <span>👀 已確認目擊 (${a.confirmations || 1})</span>
-                </button>
-                <button onclick="clearAlert('${a.id}')" class="py-2 px-3.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition">
-                  ✅ 拖車已離開
-                </button>
-              </div>
-            ` : ''}
-          </article>
-        `;
-      }).join('');
-    }
-
-    function toggleAudio() {
-      audioEnabled = !audioEnabled;
-      document.getElementById('iconAudioOn').classList.toggle('hidden', !audioEnabled);
-      document.getElementById('iconAudioOff').classList.toggle('hidden', audioEnabled);
-      showToast(audioEnabled ? '🔊' : '🔇', audioEnabled ? '已開啟警報提示音' : '已靜音警報提示音');
-      if (audioEnabled) playSirenBeep();
-    }
-
-    function playSirenBeep() {
-      if (!audioEnabled) return;
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(760, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1020, ctx.currentTime + 0.16);
-        osc.frequency.exponentialRampToValueAtTime(720, ctx.currentTime + 0.34);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.36);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.36);
-      } catch (e) {}
-    }
-
-    async function requestPushPermission() {
-      if (!('Notification' in window)) {
-        showToast('ℹ️', '已啟用網頁即時同步與 LINE 官方帳號推播');
-        return;
-      }
-      const perm = await Notification.requestPermission();
-      if (perm === 'granted') {
-        document.getElementById('pushLabel').textContent = '推播已開啟';
-        showToast('🔔', '已開啟瀏覽器與 LINE 雙重推播提醒！');
-      } else {
-        showToast('ℹ️', '網頁即時同步與 LINE 推播皆可正常運作');
-      }
-    }
-
-    function sendBrowserNotification(title, body) {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body });
-      }
-    }
-
-    let toastTimer = null;
-    function showToast(icon, msg) {
-      const el = document.getElementById('toast');
-      document.getElementById('toastIcon').textContent = icon;
-      document.getElementById('toastMsg').textContent = msg;
-      el.classList.remove('opacity-0');
-      el.classList.add('opacity-100');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => {
-        el.classList.remove('opacity-100');
-        el.classList.add('opacity-0');
-      }, 2800);
-    }
-
-    initApp();
-  </script>
-</body>
-</html>
+    });
+
+    return jsonResponse({ ok: true });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: err.message });
+  }
+}
+
+// 改用 Push 推送到單一群組（不管群組幾百人，1 次只扣 1 則額度）
+function sendLineAlert(text) {
+  if (!LINE_TARGET_GROUP_ID) {
+    return {
+      ok: false,
+      code: 400,
+      body: '尚未設定 LINE_TARGET_GROUP_ID（請先在群組輸入「綁定群組」取得 ID）'
+    };
+  }
+
+  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN
+    },
+    payload: JSON.stringify({
+      to: LINE_TARGET_GROUP_ID,
+      messages: [{ type: 'text', text: text }]
+    }),
+    muteHttpExceptions: true
+  });
+
+  const code = response.getResponseCode();
+  return {
+    ok: code >= 200 && code < 300,
+    code: code,
+    body: response.getContentText()
+  };
+}
+
+// 免費被動回覆（不計入每月 200 則上限）
+function replyLineText(replyToken, text) {
+  if (!replyToken) return;
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN
+    },
+    payload: JSON.stringify({
+      replyToken: replyToken,
+      messages: [{ type: 'text', text: text }]
+    }),
+    muteHttpExceptions: true
+  });
+}
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
